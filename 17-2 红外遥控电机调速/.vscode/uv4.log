@@ -1,0 +1,15 @@
+Build target 'Target 1'
+compiling main.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?KEY?KEY
+
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?IR_GETREPEATFLAG?IR
+
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?IR_GETADDRESS?IR
+
+Program Size: data=36.0 xdata=0 code=1052
+creating hex file from ".\Objects\Project"...
+".\Objects\Project" - 0 Error(s), 3 Warning(s).

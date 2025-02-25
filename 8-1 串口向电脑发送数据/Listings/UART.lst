@@ -1,0 +1,87 @@
+C51 COMPILER V9.54   UART                                                                  12/07/2024 15:52:18 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\Objects\UART.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE UART.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\UART
+                    -.lst) TABS(2) OBJECT(.\Objects\UART.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          
+   3          /*
+   4              *@brief 串口初始化 4800bps@11.0592MHz
+   5              *@param 无
+   6              *@retval 无
+   7          */
+   8          
+   9          void UART_Init()        //4800bps@11.0592MHz
+  10          {
+  11   1      /*
+  12   1          SM0 = 0;
+  13   1          SM1 = 1;
+  14   1          SM2 = 0;
+  15   1          REN = 0;
+  16   1          TB8 = 0;
+  17   1          RB8 = 0;
+  18   1          TI = 0;
+  19   1          RI = 0;
+  20   1      */
+  21   1        // PCON |= 0x80;    //使能波特率倍速位SMOD
+  22   1          // SCON =0x40;
+  23   1          // TMOD &= 0x0F;  //清除低四位
+  24   1        // TMOD |= 0x20;  //设置定时器模式1,16位定时器模式
+  25   1        // TL1 = 0xF4;    //设定定时初值
+  26   1        // TH1 = 0xF4;    //设定定时器重装值
+  27   1        // ET1 = 0;   //禁止定时器1中断
+  28   1        // TR1 = 1;   //启动定时器1
+  29   1      
+  30   1      
+  31   1        // PCON |= 0x80;    //使能波特率倍速位SMOD
+  32   1        // SCON = 0x50;   //8位数据,可变波特率
+  33   1        // TMOD &= 0x0F;    //清除定时器1模式位
+  34   1        // TMOD |= 0x20;    //设定定时器1为8位自动重装方式
+  35   1        // TL1 = 0xF4;    //设定定时初值
+  36   1        // TH1 = 0xF4;    //设定定时器重装值
+  37   1        // ET1 = 0;   //禁止定时器1中断
+  38   1        // TR1 = 1;   //启动定时器1
+  39   1      
+  40   1        PCON &= 0x7F;   //波特率不倍速
+  41   1        SCON = 0x50;    //8位数据,可变波特率
+  42   1        TMOD &= 0x0F;   //清除定时器1模式位
+  43   1        TMOD |= 0x20;   //设定定时器1为8位自动重装方式
+  44   1        TL1 = 0xFA;   //设定定时初值
+  45   1        TH1 = 0xFA;   //设定定时器重装值
+  46   1        ET1 = 0;    //禁止定时器1中断
+  47   1        TR1 = 1;    //启动定时器1
+  48   1      }
+  49          
+  50          /*
+  51              *@brief 串口发送一个字节数据
+  52              *@param Byte:待发送的一个字节数据
+  53              *@retval 无
+  54          */
+C51 COMPILER V9.54   UART                                                                  12/07/2024 15:52:18 PAGE 2   
+
+  55          
+  56          void UART_SendByte(unsigned char Byte)
+  57          {
+  58   1          SBUF = Byte;
+  59   1          while(TI == 0);
+  60   1          TI = 0;
+  61   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     31    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

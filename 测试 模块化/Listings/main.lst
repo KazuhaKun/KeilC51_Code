@@ -1,0 +1,171 @@
+C51 COMPILER V9.54   MAIN                                                                  11/18/2024 19:55:18 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "nixie.h"
+   3          #include "delay.h"
+   4          
+   5          //数码管
+   6          #ifndef __NIXIE_H__
+              
+              unsigned char NixieCode[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,0x00};
+              
+              #endif
+  11          
+  12          //LED
+  13          unsigned char LEDCode[] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F};
+  14          
+  15          //LED位置检测
+  16          unsigned char detectLEDPosition()
+  17          {
+  18   1          unsigned char position;
+  19   1          for (position = 0; position < 7; position++)
+  20   1          {
+  21   2              if (P2 == LEDCode[position])
+  22   2              {
+  23   3                  return position + 1; 
+  24   3              }
+  25   2          }
+  26   1          return 0;
+  27   1      }
+  28          
+  29          
+  30          
+  31          //一些变量
+  32          unsigned int t, i;
+  33          unsigned int b = 500;
+  34          unsigned char led_num = 0;
+  35          
+  36          //K2 延时增加函数
+  37          void delayk2()
+  38          {
+  39   1          if (P3_0 == 0) {
+  40   2          Delay(20);
+  41   2              while(P3_0 == 0);
+  42   2              Delay(20);
+  43   2              b += 500;
+  44   2          if (b > 2000) b = 500;
+  45   2        }
+  46   1      }
+  47          
+  48          //模式一
+  49          void mode1(unsigned char Location1)
+  50          {
+  51   1          for (t = 0; t < b; t++) {
+  52   2              P2 = LEDCode[Location1];
+  53   2              Nixie(7,Location1+1);
+  54   2              if (P3_0 == 0) break;
+C51 COMPILER V9.54   MAIN                                                                  11/18/2024 19:55:18 PAGE 2   
+
+  55   2              if (P3_2 == 0) break;
+  56   2              if (P3_3 == 0) break;
+  57   2          }
+  58   1          delayk2();
+  59   1      }   
+  60          
+  61          void main()
+  62          {
+  63   1          unsigned char led_status = 0;
+  64   1          unsigned int mode = 0;
+  65   1      //开机显示学号后四位
+  66   1          for (i = 0; i < 1000; i++)
+  67   1          {
+  68   2              Nixie(5,1);
+  69   2              Nixie(4,9);
+  70   2              Nixie(3,2);
+  71   2              Nixie(2,0);
+  72   2              if (P3_1 == 0 || P3_3 == 0) break;
+  73   2              if (P3_2 == 0)
+  74   2              {
+  75   3                  P2 = ~led_status;
+  76   3                  break;
+  77   3              }
+  78   2          }
+  79   1      //主功能
+  80   1          while(1)
+  81   1          {
+  82   2              if (P3_1 == 0) mode = 1;
+  83   2              if (P3_2 == 0) mode = 2;
+  84   2              if (P3_3 == 0) {
+  85   3                  mode = 3;
+  86   3                  led_num = 0;
+  87   3              }
+  88   2      
+  89   2              switch (mode) 
+  90   2              {
+  91   3      //主功能一
+  92   3                  case 1: 
+  93   3                  {
+  94   4                      mode1(led_num);
+  95   4                      if (led_num < 8) led_num++;
+  96   4                      if (led_num == 8) led_num = 0;
+  97   4                      break;
+  98   4                  }
+  99   3      //主功能二
+ 100   3                  case 2: 
+ 101   3                  {
+ 102   4                      if(P3_2 == 0)
+ 103   4                      {
+ 104   5                          Delay(100);
+ 105   5                          while(P3_2 == 0);
+ 106   5                          Delay(100);
+ 107   5                          led_status <<= 1;
+ 108   5                          
+ 109   5                          if (led_status == 0) led_status = 0x01;
+ 110   5                          
+ 111   5                          while (P3_2 == 1) 
+ 112   5                          {
+ 113   6                              P2 = ~led_status;
+ 114   6                              if (P2 != 0x7F) Nixie(7, detectLEDPosition());
+ 115   6      
+ 116   6                              if (P2 == 0x7F) for (i = 0; i < 8; i++) for (t = 0; t < 500; t++) 
+C51 COMPILER V9.54   MAIN                                                                  11/18/2024 19:55:18 PAGE 3   
+
+ 117   6                              {
+ 118   7                                  Nixie(7, i+1);
+ 119   7                                  if (P3_1 == 0 || P3_2 == 0 || P3_3 == 0) break;
+ 120   7                              }
+ 121   6                              if (P3_1 == 0 || P3_2 == 0 || P3_3 == 0) break;
+ 122   6                          }
+ 123   5                      }
+ 124   4                      break;
+ 125   4                  }
+ 126   3      //主功能三
+ 127   3                  case 3: 
+ 128   3                  {
+ 129   4                      Delay(20);
+ 130   4                      while(P3_3 == 0);
+ 131   4                      Delay(20);
+ 132   4      
+ 133   4                      for (i = 0; i < 8; i++) for (t = 0; t < 500; t++) 
+ 134   4                      {
+ 135   5                          Nixie(7-i, 8);
+ 136   5                          P2 = 0x00;
+ 137   5                          if (P3_1 == 0 || P3_2 == 0) break;
+ 138   5                      }
+ 139   4                      break;
+ 140   4                  }
+ 141   3              }
+ 142   2          }
+ 143   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    502    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     15       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

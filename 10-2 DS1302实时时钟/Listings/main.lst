@@ -1,0 +1,207 @@
+C51 COMPILER V9.54   MAIN                                                                  11/27/2024 20:37:22 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "LCD1602.h"
+   3          #include "DS1302.h"
+   4          #include "delay.h"
+   5          #include "Key.h"
+   6          
+   7          unsigned char Year, Month, Date, Hour, Min, Sec, Day;
+   8          unsigned char KeyNum;
+   9          
+  10          void LCD_ShowTime()
+  11          {   
+  12   1          //8C 88 86 84 82 80 8A
+  13   1          //8D 89 87 85 83 81 8B
+  14   1          // Year = DS1302_ReadByte(0x8D);
+  15   1          Year = DS1302_Time_DEC[0];
+  16   1          LCD_ShowNum(1,7,Year,2);
+  17   1          Month = DS1302_Time_DEC[1];
+  18   1          LCD_ShowNum(1,10,Month,2);
+  19   1          Date = DS1302_Time_DEC[2];
+  20   1          LCD_ShowNum(1,13,Date,2);
+  21   1          Hour = DS1302_Time_DEC[3];
+  22   1          LCD_ShowNum(2,1,Hour,2);  
+  23   1          Min = DS1302_Time_DEC[4];
+  24   1          LCD_ShowNum(2,4,Min,2); 
+  25   1          Sec = DS1302_Time_DEC[5];
+  26   1          LCD_ShowNum(2,7,Sec,2);
+  27   1          Day = DS1302_Time_DEC[6];
+  28   1          LCD_ShowNum(1,16,Day,1);
+  29   1          // Delay(50);
+  30   1      }
+  31          
+  32          void main()
+  33          {
+  34   1        //初始化LCD、DS1302
+  35   1        LCD_Init();
+  36   1        DS1302_Init();
+  37   1        //显示不变要素
+  38   1        LCD_ShowString(1, 1, "RTC");
+  39   1        LCD_ShowString(1,9,"/  /   ");
+  40   1        LCD_ShowString(2, 3, ":  :");
+  41   1        DS1302_SetTime();
+  42   1        while(1)
+  43   1        {
+  44   2          unsigned char i;
+  45   2          //模式选择
+  46   2          unsigned char Mode;
+  47   2          KeyNum = Key();
+  48   2          if(KeyNum == 1)
+  49   2          {
+  50   3            Mode++;
+  51   3            if(Mode > 8) Mode = 0;
+  52   3          }
+  53   2      
+  54   2      
+C51 COMPILER V9.54   MAIN                                                                  11/27/2024 20:37:22 PAGE 2   
+
+  55   2          switch(Mode)
+  56   2          {
+  57   3            case 0:
+  58   3            {
+  59   4              LCD_ShowString(2,12,"     ");
+  60   4              DS1302_ReadTime();
+  61   4              LCD_ShowTime();
+  62   4              break;
+  63   4            }
+  64   3            case 1:
+  65   3            {
+  66   4              LCD_ShowString(2,12,"Year ");
+  67   4              if(KeyNum == 2) DS1302_Time_DEC[0]++;
+  68   4              if(KeyNum == 3) DS1302_Time_DEC[0]--;
+  69   4              if(DS1302_Time_DEC[0] > 99) DS1302_Time_DEC[0] = 0;
+  70   4              if(DS1302_Time_DEC[0] < 0) DS1302_Time_DEC[0] = 99;
+  71   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+  72   4              for(i=0;i<1500;i++) 
+  73   4              {
+  74   5                LCD_ShowString(1,7,"  ");
+  75   5                Delay(1000);
+  76   5                LCD_ShowNum(1,7,DS1302_Time_DEC[0],2);
+  77   5              }
+  78   4              break;
+  79   4            }
+  80   3            case 2:
+  81   3            {
+  82   4              LCD_ShowString(2,12,"Month");
+  83   4              if(KeyNum == 2) DS1302_Time_DEC[1]++;
+  84   4              if(KeyNum == 3) DS1302_Time_DEC[1]--;
+  85   4              if(DS1302_Time_DEC[1] > 12) DS1302_Time_DEC[1] = 1;
+  86   4              if(DS1302_Time_DEC[1] < 1) DS1302_Time_DEC[1] = 12;
+  87   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+  88   4              LCD_ShowNum(1,10,DS1302_Time_DEC[1],2);
+  89   4              break;
+  90   4            }
+  91   3            case 3:
+  92   3            {
+  93   4              LCD_ShowString(2,12,"Date ");
+  94   4              if(KeyNum == 2) DS1302_Time_DEC[2]++;
+  95   4              if(KeyNum == 3) DS1302_Time_DEC[2]--;
+  96   4              if(DS1302_Time_DEC[1] == 2)
+  97   4              {
+  98   5                if(DS1302_Time_DEC[0] % 4 == 0)
+  99   5                {
+ 100   6                  if(DS1302_Time_DEC[2] > 29) DS1302_Time_DEC[2] = 1;
+ 101   6                  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 29;
+ 102   6                }
+ 103   5                else
+ 104   5                {
+ 105   6                  if(DS1302_Time_DEC[2] > 28) DS1302_Time_DEC[2] = 1;
+ 106   6                  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 28;
+ 107   6                }
+ 108   5              }
+ 109   4              else if(DS1302_Time_DEC[1] == 4 || DS1302_Time_DEC[1] == 6 || DS1302_Time_DEC[1] == 9 || DS1302_Time_D
+             -EC[1] == 11)
+ 110   4              {
+ 111   5                if(DS1302_Time_DEC[2] > 30) DS1302_Time_DEC[2] = 1;
+ 112   5                if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 30;
+ 113   5              }
+ 114   4              else
+ 115   4              {
+C51 COMPILER V9.54   MAIN                                                                  11/27/2024 20:37:22 PAGE 3   
+
+ 116   5                if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 117   5                if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;
+ 118   5              }
+ 119   4              if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 120   4              if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;
+ 121   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 122   4              LCD_ShowNum(1,13,DS1302_Time_DEC[2],2);
+ 123   4              break;
+ 124   4            }
+ 125   3            case 4:
+ 126   3            {
+ 127   4              LCD_ShowString(2,12,"Day  ");
+ 128   4              if(KeyNum == 2) DS1302_Time_DEC[6]++;
+ 129   4              if(KeyNum == 3) DS1302_Time_DEC[6]--;
+ 130   4              if(DS1302_Time_DEC[6] > 7) DS1302_Time_DEC[6] = 1;
+ 131   4              if(DS1302_Time_DEC[6] < 1) DS1302_Time_DEC[6] = 7;
+ 132   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 133   4              LCD_ShowNum(1,16,DS1302_Time_DEC[6],1);
+ 134   4              break;
+ 135   4            }
+ 136   3            case 5:
+ 137   3            {
+ 138   4              LCD_ShowString(2,12,"Hour ");
+ 139   4              if(KeyNum == 2) DS1302_Time_DEC[3]++;
+ 140   4              if(KeyNum == 3) DS1302_Time_DEC[3]--;
+ 141   4              if(DS1302_Time_DEC[3] > 23) DS1302_Time_DEC[3] = 0;
+ 142   4              if(DS1302_Time_DEC[3] < 0) DS1302_Time_DEC[3] = 23;
+ 143   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 144   4              LCD_ShowNum(2,1,DS1302_Time_DEC[3],2);
+ 145   4              break;
+ 146   4            }
+ 147   3            case 6:
+ 148   3            {
+ 149   4              LCD_ShowString(2,12,"Min  ");
+ 150   4              if(KeyNum == 2) DS1302_Time_DEC[4]++;
+ 151   4              if(KeyNum == 3) DS1302_Time_DEC[4]--;
+ 152   4              if(DS1302_Time_DEC[4] > 59) DS1302_Time_DEC[4] = 0;
+ 153   4              if(DS1302_Time_DEC[4] < 0) DS1302_Time_DEC[4] = 59;
+ 154   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 155   4              LCD_ShowNum(2,4,DS1302_Time_DEC[4],2);
+ 156   4              break;
+ 157   4            }
+ 158   3            case 7:
+ 159   3            {
+ 160   4              LCD_ShowString(2,12,"Sec  ");
+ 161   4              if(KeyNum == 2) DS1302_Time_DEC[5]++;
+ 162   4              if(KeyNum == 3) DS1302_Time_DEC[5]--;
+ 163   4              if(DS1302_Time_DEC[5] > 59) DS1302_Time_DEC[5] = 0;
+ 164   4              if(DS1302_Time_DEC[5] < 0) DS1302_Time_DEC[5] = 59;
+ 165   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 166   4              LCD_ShowNum(2,7,DS1302_Time_DEC[5],2);
+ 167   4              break;
+ 168   4            }
+ 169   3          }
+ 170   2        }
+ 171   1      }
+ 172          //K1 切换模式 
+ 173          //M0:显示时间 M1:设置年份 M2:设置月份 M3:设置日期 M4:设置星期 M5:设置时钟 M6:设�
+             -�分钟 M7:设置秒钟
+ 174          //K2 增加 K3 减少
+ 175          //K4 保存
+
+C51 COMPILER V9.54   MAIN                                                                  11/27/2024 20:37:22 PAGE 4   
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    928    ----
+   CONSTANT SIZE    =     68    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,18 @@
+Build target 'Target 1'
+compiling main.c...
+main.c(52): error C213: left side of asn-op not an lvalue
+main.c(69): error C187: not an lvalue
+main.c(70): error C187: not an lvalue
+main.c(83): error C187: not an lvalue
+main.c(84): error C187: not an lvalue
+main.c(96): error C187: not an lvalue
+main.c(97): error C187: not an lvalue
+main.c(132): error C187: not an lvalue
+main.c(133): error C187: not an lvalue
+main.c(146): error C187: not an lvalue
+main.c(147): error C187: not an lvalue
+main.c(161): error C187: not an lvalue
+main.c(162): error C187: not an lvalue
+main.c(176): error C187: not an lvalue
+main.c(177): error C187: not an lvalue
+Target not created.

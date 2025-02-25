@@ -1,0 +1,9 @@
+Build target 'Target 1'
+compiling UART.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAY?DELAY
+
+Program Size: data=10.0 xdata=0 code=76
+creating hex file from ".\Objects\Project"...
+".\Objects\Project" - 0 Error(s), 1 Warning(s).

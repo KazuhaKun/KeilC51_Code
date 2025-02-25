@@ -1,0 +1,12 @@
+Build target 'Target 1'
+compiling main.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?KEY?KEY
+
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_NIXIE?NIXIE
+
+Program Size: data=23.0 xdata=0 code=503
+creating hex file from ".\Objects\Project"...
+".\Objects\Project" - 0 Error(s), 2 Warning(s).

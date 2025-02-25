@@ -1,0 +1,115 @@
+C51 COMPILER V9.54   MAIN                                                                  11/25/2024 20:27:02 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "delay.h"
+   3          
+   4          sbit RCK = P3^5;    //RCLK
+   5          sbit SCK = P3^6;    //SRCLK
+   6          sbit SER = P3^4;
+   7          
+   8          #define MATRIX_LED_PORT P0
+   9          
+  10          void _74HC595_WriteByte(unsigned char Byte)
+  11          {
+  12   1        unsigned char i;
+  13   1        RCK = 0;
+  14   1        SCK = 0;
+  15   1        for(i=0;i<8;i++)
+  16   1        {
+  17   2          SER = Byte >> 7;
+  18   2          Byte <<= 1;
+  19   2          SCK = 1;
+  20   2          SCK = 0;
+  21   2        }
+  22   1        RCK = 1;
+  23   1        RCK = 0;
+  24   1      }
+  25          
+  26          /* 江协写法
+  27          void _74HC595_WriteByte(unsigned char Byte) {
+  28            unsigned char i;
+  29            RCK = 0;
+  30            SCK = 0;
+  31            for(i=0;i<8;i++)
+  32            {
+  33              SER = Byte & (0x80 >> i);
+  34              SCK = 1;
+  35              SCK = 0;
+  36            }
+  37            RCK = 1;
+  38            RCK = 0;
+  39          } 
+  40          */
+  41          
+  42          // unsigned char ColumnData[9] = {0x00,0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01};
+  43          
+  44          void MatrixLED_ShowColumn(unsigned int Column,Data)
+  45          {
+  46   1        if (Column <= 8)
+  47   1        {
+  48   2          _74HC595_WriteByte(Data);
+  49   2          // MATRIX_LED_PORT = ~ ColumnData[Column];
+  50   2          MATRIX_LED_PORT = ~ (0x80 >> (Column - 1));
+  51   2          Delay(1);
+  52   2          MATRIX_LED_PORT = 0xFF;
+  53   2        }
+  54   1        if (Column > 8)
+C51 COMPILER V9.54   MAIN                                                                  11/25/2024 20:27:02 PAGE 2   
+
+  55   1        {
+  56   2          unsigned char x,y,z;
+  57   2          _74HC595_WriteByte(Data);
+  58   2          x = (Column & 0x0F) << 4 | (Column & 0xF0) >> 4;
+  59   2          y = (Column & 0x33) << 2 | (Column & 0xCC) >> 2;
+  60   2          z = (Column & 0x55) << 1 | (Column & 0xAA) >> 1;
+  61   2          MATRIX_LED_PORT = z;
+  62   2          Delay(1);
+  63   2          MATRIX_LED_PORT = 0xFF;
+  64   2        }
+  65   1        if (Column > 0xff) return;
+  66   1      }
+  67          
+  68          void main()
+  69          {
+  70   1        SCK = 0;
+  71   1        RCK = 0;
+  72   1        while(1)
+  73   1        {
+  74   2          MatrixLED_ShowColumn(1,0x3C);
+  75   2          MatrixLED_ShowColumn(2,0x42);
+  76   2          MatrixLED_ShowColumn(3,0xA9);
+  77   2          MatrixLED_ShowColumn(4,0x85);
+  78   2          MatrixLED_ShowColumn(5,0x85);
+  79   2          MatrixLED_ShowColumn(6,0xA9);
+  80   2          MatrixLED_ShowColumn(7,0x42);
+  81   2          MatrixLED_ShowColumn(8,0x3C);
+  82   2          // unsigned char i;
+  83   2          // for(i = 1; i <= 8; i++)
+  84   2          // {
+  85   2          //  MatrixLED_ShowColumn(0xAA,i);
+  86   2          //  Delay(1000);
+  87   2          // }
+  88   2        }
+  89   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    277    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       7
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

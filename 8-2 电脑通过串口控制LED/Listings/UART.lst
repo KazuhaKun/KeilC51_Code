@@ -1,0 +1,81 @@
+C51 COMPILER V9.54   UART                                                                  11/24/2024 20:01:45 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\Objects\UART.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE UART.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\UART
+                    -.lst) TABS(2) OBJECT(.\Objects\UART.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          
+   3          /*
+   4              *@brief 串口初始化 4800bps@11.0592MHz
+   5              *@param 无
+   6              *@retval 无
+   7          */
+   8          
+   9          void UART_Init()        //4800bps@11.0592MHz
+  10          {
+  11   1      /*
+  12   1          SM0 = 0;
+  13   1          SM1 = 1;
+  14   1          SM2 = 0;
+  15   1          REN = 0;
+  16   1          TB8 = 0;
+  17   1          RB8 = 0;
+  18   1          TI = 0;
+  19   1          RI = 0;
+  20   1      */
+  21   1        PCON |= 0x80;   //使能波特率倍速位SMOD
+  22   1          SCON =0x50;
+  23   1          TMOD &= 0x0F; //清除低四位
+  24   1        TMOD |= 0x20; //设置定时器模式1,16位定时器模式
+  25   1        TL1 = 0xF4;   //设定定时初值
+  26   1        TH1 = 0xF4;   //设定定时器重装值
+  27   1        ET1 = 0;    //禁止定时器1中断
+  28   1        TR1 = 1;    //启动定时器1
+  29   1          EA = 1;         //开总中断
+  30   1          ES = 1;         //开串口中断
+  31   1      }
+  32          
+  33          /*
+  34              *@brief 串口发送一个字节数据
+  35              *@param Byte:待发送的一个字节数据
+  36              *@retval 无
+  37          */
+  38          
+  39          void UART_SendByte(unsigned char Byte)
+  40          {
+  41   1          SBUF = Byte;
+  42   1          while(TI == 0);
+  43   1          TI = 0;
+  44   1      }
+  45          
+  46          /*
+  47          void UART_Routine() interrupt 4
+  48          {
+  49              if(RI == 1)
+  50              {
+  51          
+  52                  RI = 0;
+  53              }
+  54          }
+C51 COMPILER V9.54   UART                                                                  11/24/2024 20:01:45 PAGE 2   
+
+  55          */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     35    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

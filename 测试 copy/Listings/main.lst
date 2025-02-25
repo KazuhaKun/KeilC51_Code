@@ -1,0 +1,189 @@
+C51 COMPILER V9.54   MAIN                                                                  11/13/2024 15:43:02 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          
+   3          //数码管
+   4          unsigned char NixieCode[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,0x00};
+   5          //LED
+   6          unsigned char LEDCode[] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F};
+   7          
+   8          //LED位置检测
+   9          unsigned char detectLEDPosition()
+  10          {
+  11   1          unsigned char position;
+  12   1          for (position = 0; position < 7; position++)
+  13   1          {
+  14   2              if (P2 == LEDCode[position])
+  15   2              {
+  16   3                  return position + 1; 
+  17   3              }
+  18   2          }
+  19   1          return 0;
+  20   1      }
+  21          
+  22          //延时函数
+  23          void Delay(unsigned int xms)    //@11.0592MHz
+  24          {
+  25   1          unsigned char i, j;
+  26   1          while(xms)
+  27   1          {
+  28   2              i = 2;
+  29   2              j = 199;
+  30   2              do
+  31   2              {
+  32   3                  while (--j);
+  33   3              } while (--i);
+  34   2              xms--;
+  35   2          }
+  36   1      }
+  37          
+  38          //数码管显示函数
+  39          void Nixie(unsigned char Location, unsigned char Num)
+  40          {
+  41   1          P2_2 = Location & 0x01;
+  42   1          P2_3 = (Location >> 1) & 0x01;
+  43   1          P2_4 = (Location >> 2) & 0x01;
+  44   1          P0 = NixieCode[Num];
+  45   1          Delay(1);
+  46   1          P0 = 0x00;
+  47   1      }
+  48          
+  49          //一些变量
+  50          unsigned int t, i;
+  51          unsigned int b = 500;
+  52          unsigned char led_num = 0;
+  53          
+  54          //K2 延时增加函数
+C51 COMPILER V9.54   MAIN                                                                  11/13/2024 15:43:02 PAGE 2   
+
+  55          void delayk2()
+  56          {
+  57   1          if (P3_0 == 0) {
+  58   2          Delay(20);
+  59   2              while(P3_0 == 0);
+  60   2              Delay(20);
+  61   2              b += 500;
+  62   2          if (b > 2000) b = 500;
+  63   2        }
+  64   1      }
+  65          
+  66          //模式一
+  67          void mode1(unsigned char Location1)
+  68          {
+  69   1          for (t = 0; t < b; t++) {
+  70   2              P2 = LEDCode[Location1];
+  71   2              Nixie(7,Location1+1);
+  72   2              if (P3_0 == 0) break;
+  73   2              if (P3_2 == 0) break;
+  74   2              if (P3_3 == 0) break;
+  75   2          }
+  76   1          delayk2();
+  77   1      }   
+  78          
+  79          void main()
+  80          {
+  81   1          unsigned char led_status = 0;
+  82   1          unsigned int mode = 0;
+  83   1      //开机显示学号后四位
+  84   1          for (i = 0; i < 1000; i++)
+  85   1          {
+  86   2              Nixie(5,1);
+  87   2              Nixie(4,9);
+  88   2              Nixie(3,2);
+  89   2              Nixie(2,0);
+  90   2              if (P3_1 == 0 || P3_3 == 0) break;
+  91   2              if (P3_2 == 0)
+  92   2              {
+  93   3                  P2 = ~led_status;
+  94   3                  break;
+  95   3              }
+  96   2          }
+  97   1      //主功能
+  98   1          while(1)
+  99   1          {
+ 100   2              if (P3_1 == 0) mode = 1;
+ 101   2              if (P3_2 == 0) mode = 2;
+ 102   2              if (P3_3 == 0) {
+ 103   3                  mode = 3;
+ 104   3                  led_num = 0;
+ 105   3              }
+ 106   2      
+ 107   2              switch (mode) 
+ 108   2              {
+ 109   3      //主功能一
+ 110   3                  case 1: 
+ 111   3                  {
+ 112   4                      mode1(led_num);
+ 113   4                      if (led_num < 8) led_num++;
+ 114   4                      if (led_num == 8) led_num = 0;
+ 115   4                      break;
+ 116   4                  }
+C51 COMPILER V9.54   MAIN                                                                  11/13/2024 15:43:02 PAGE 3   
+
+ 117   3      //主功能二
+ 118   3                  case 2: 
+ 119   3                  {
+ 120   4                      if(P3_2 == 0)
+ 121   4                      {
+ 122   5                          Delay(100);
+ 123   5                          while(P3_2 == 0);
+ 124   5                          Delay(100);
+ 125   5                          led_status <<= 1;
+ 126   5                          
+ 127   5                          if (led_status == 0) led_status = 0x01;
+ 128   5                          
+ 129   5                          while (P3_2 == 1) 
+ 130   5                          {
+ 131   6                              P2 = ~led_status;
+ 132   6                              if (P2 != 0x7F) Nixie(7, detectLEDPosition());
+ 133   6      
+ 134   6                              if (P2 == 0x7F) for (i = 0; i < 8; i++) for (t = 0; t < 500; t++) 
+ 135   6                              {
+ 136   7                                  Nixie(7, i+1);
+ 137   7                                  if (P3_1 == 0 || P3_2 == 0 || P3_3 == 0) break;
+ 138   7                              }
+ 139   6                              if (P3_1 == 0 || P3_2 == 0 || P3_3 == 0) break;
+ 140   6                          }
+ 141   5                      }
+ 142   4                      break;
+ 143   4                  }
+ 144   3      //主功能三
+ 145   3                  case 3: 
+ 146   3                  {
+ 147   4                      Delay(20);
+ 148   4                      while(P3_3 == 0);
+ 149   4                      Delay(20);
+ 150   4      
+ 151   4                      for (i = 0; i < 8; i++) for (t = 0; t < 500; t++) 
+ 152   4                      {
+ 153   5                          Nixie(7-i, 8);
+ 154   5                          P2 = 0x00;
+ 155   5                          if (P3_1 == 0 || P3_2 == 0) break;
+ 156   5                      }
+ 157   4                      break;
+ 158   4                  }
+ 159   3              }
+ 160   2          }
+ 161   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    538    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     26       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

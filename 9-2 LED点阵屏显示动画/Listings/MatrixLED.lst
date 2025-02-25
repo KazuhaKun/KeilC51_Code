@@ -1,0 +1,109 @@
+C51 COMPILER V9.54   MATRIXLED                                                             11/25/2024 21:14:02 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MATRIXLED
+OBJECT MODULE PLACED IN .\Objects\MatrixLED.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE MatrixLED.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings
+                    -\MatrixLED.lst) TABS(2) OBJECT(.\Objects\MatrixLED.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "delay.h"
+   3          
+   4          sbit RCK = P3^5;    //RCLK
+   5          sbit SCK = P3^6;    //SRCLK
+   6          sbit SER = P3^4;
+   7          
+   8          #define MATRIX_LED_PORT P0
+   9          /*
+  10            *@brief 74HC595写入一个字节
+  11            *@param Byte  要写入的字节
+  12            *@retval  无
+  13          */
+  14          void _74HC595_WriteByte(unsigned char Byte)
+  15          {
+  16   1        unsigned char i;
+  17   1        RCK = 0;
+  18   1        SCK = 0;
+  19   1        for(i=0;i<8;i++)
+  20   1        {
+  21   2          SER = Byte >> 7;
+  22   2          Byte <<= 1;
+  23   2          SCK = 1;
+  24   2          SCK = 0;
+  25   2        }
+  26   1        RCK = 1;
+  27   1        RCK = 0;
+  28   1      }
+  29          
+  30          /* 江协写法
+  31          void _74HC595_WriteByte(unsigned char Byte) {
+  32            unsigned char i;
+  33            RCK = 0;
+  34            SCK = 0;
+  35            for(i=0;i<8;i++)
+  36            {
+  37              SER = Byte & (0x80 >> i);
+  38              SCK = 1;
+  39              SCK = 0;
+  40            }
+  41            RCK = 1;
+  42            RCK = 0;
+  43          } 
+  44          */
+  45          
+  46          // unsigned char ColumnData[9] = {0x00,0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01};
+  47          
+  48          /*
+  49            *@brief LED点阵屏显示某一列&某几列
+  50            *@param Column  (0~8)显示的某一列数 (0~0xff)显示的某几列数 均为从左到右
+  51            *@param Data  选择列现实的数据，高位在上，1亮0灭
+  52            *@retval  无
+  53          */
+  54          
+C51 COMPILER V9.54   MATRIXLED                                                             11/25/2024 21:14:02 PAGE 2   
+
+  55          void MatrixLED_ShowColumn(unsigned int Column,Data)
+  56          {
+  57   1        if (Column <= 8)
+  58   1        {
+  59   2          _74HC595_WriteByte(Data);
+  60   2          // MATRIX_LED_PORT = ~ ColumnData[Column];
+  61   2          MATRIX_LED_PORT = ~ (0x80 >> Column);
+  62   2          Delay(1);
+  63   2          MATRIX_LED_PORT = 0xFF;
+  64   2        }
+  65   1        if (Column > 8)
+  66   1        {
+  67   2          unsigned char x,y,z;
+  68   2          _74HC595_WriteByte(Data);
+  69   2          x = (Column & 0x0F) << 4 | (Column & 0xF0) >> 4;
+  70   2          y = (Column & 0x33) << 2 | (Column & 0xCC) >> 2;
+  71   2          z = (Column & 0x55) << 1 | (Column & 0xAA) >> 1;
+  72   2          MATRIX_LED_PORT = z;
+  73   2          Delay(1);
+  74   2          MATRIX_LED_PORT = 0xFF;
+  75   2        }
+  76   1        if (Column > 0xff) return;
+  77   1      }
+  78          
+  79          void MatrixLED_Init()
+  80          {
+  81   1          SCK = 0;
+  82   1        RCK = 0;
+  83   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    192    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       7
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

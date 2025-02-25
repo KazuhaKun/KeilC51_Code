@@ -1,0 +1,354 @@
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "LCD1602.h"
+   3          #include "DS1302.h"
+   4          #include "delay.h"
+   5          #include "Key.h"
+   6          #include "Timer0.h"
+   7          
+   8          unsigned char Year, Month, Date, Hour, Min, Sec, Day;
+   9          unsigned char KeyNum, TimeSetFlashFlag;
+  10          
+  11          void LCD_ShowTime()
+  12          {   
+  13   1          //8C 88 86 84 82 80 8A
+  14   1          //8D 89 87 85 83 81 8B
+  15   1          // Year = DS1302_ReadByte(0x8D);
+  16   1          Year = DS1302_Time_DEC[0];
+  17   1          LCD_ShowNum(1,7,Year,2);
+  18   1          Month = DS1302_Time_DEC[1];
+  19   1          LCD_ShowNum(1,10,Month,2);
+  20   1          Date = DS1302_Time_DEC[2];
+  21   1          LCD_ShowNum(1,13,Date,2);
+  22   1          Hour = DS1302_Time_DEC[3];
+  23   1          LCD_ShowNum(2,1,Hour,2);  
+  24   1          Min = DS1302_Time_DEC[4];
+  25   1          LCD_ShowNum(2,4,Min,2); 
+  26   1          Sec = DS1302_Time_DEC[5];
+  27   1          LCD_ShowNum(2,7,Sec,2);
+  28   1          Day = DS1302_Time_DEC[6];
+  29   1          LCD_ShowNum(1,16,Day,1);
+  30   1          // Delay(50);
+  31   1      }
+  32          
+  33          void main()
+  34          {
+  35   1        //初始化LCD、DS1302
+  36   1        LCD_Init();
+  37   1        DS1302_Init();
+  38   1        Timer0Init();
+  39   1        //显示不变要素
+  40   1        LCD_ShowString(1, 1, "RTC");
+  41   1        LCD_ShowString(1,9,"/  /   ");
+  42   1        LCD_ShowString(2, 3, ":  :");
+  43   1        DS1302_SetTime();
+  44   1        DS1302_ReadTime();
+  45   1        while(1)
+  46   1        {
+  47   2          unsigned char i;
+  48   2          unsigned char DS1302_Time_Backup[7];
+  49   2          //模式选择
+  50   2          unsigned char Mode;
+  51   2          KeyNum = Key();
+  52   2          if(KeyNum == 1) Mode ++%= 9;
+*** ERROR C213 IN LINE 52 OF main.c: left side of asn-op not an lvalue
+  53   2          switch(Mode)
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 2   
+
+  54   2          {
+  55   3            case 0:
+  56   3            {
+  57   4              LCD_ShowString(2,12,"     ");
+  58   4              DS1302_ReadTime();
+  59   4              LCD_ShowTime();
+  60   4              break;
+  61   4            }
+  62   3            case 1:
+  63   3            {
+  64   4              for(i = 0; i < 7; i++)
+  65   4              {
+  66   5                DS1302_Time_Backup[i] = DS1302_Time_DEC[i];
+  67   5              }
+  68   4              LCD_ShowString(2,12,"Year ");
+  69   4              if(KeyNum == 2) DS1302_Time_DEC[0]++;
+*** ERROR C187 IN LINE 69 OF main.c: not an lvalue
+  70   4              if(KeyNum == 3 && DS1302_Time_DEC[0] != 0) DS1302_Time_DEC[0]--;
+*** ERROR C187 IN LINE 70 OF main.c: not an lvalue
+  71   4              else if(KeyNum == 3 && DS1302_Time_DEC[0] == 0) DS1302_Time_DEC[0] = 99;
+  72   4              if(DS1302_Time_DEC[0] > 99) DS1302_Time_DEC[0] = 0;
+  73   4              // if(DS1302_Time_DEC[0] < 0) DS1302_Time_DEC[0] = 99;
+  74   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+  75   4              if(TimeSetFlashFlag == 1){LCD_ShowString(1,7,"  ");}
+  76   4              else {LCD_ShowNum(1,7,DS1302_Time_DEC[0],2);}
+  77   4              break;
+  78   4            }
+  79   3            case 2:
+  80   3            {
+  81   4              LCD_ShowNum(1,7,DS1302_Time_DEC[0],2);
+  82   4              LCD_ShowString(2,12,"Month");
+  83   4              if(KeyNum == 2) DS1302_Time_DEC[1]++;
+*** ERROR C187 IN LINE 83 OF main.c: not an lvalue
+  84   4              if(KeyNum == 3) DS1302_Time_DEC[1]--;
+*** ERROR C187 IN LINE 84 OF main.c: not an lvalue
+  85   4              if(DS1302_Time_DEC[1] > 12) DS1302_Time_DEC[1] = 1;
+  86   4              if(DS1302_Time_DEC[1] < 1) DS1302_Time_DEC[1] = 12;
+  87   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+  88   4              if(TimeSetFlashFlag == 1){LCD_ShowString(1,10,"  ");}
+  89   4              else {LCD_ShowNum(1,10,DS1302_Time_DEC[1],2);}
+  90   4              break;
+  91   4            }
+  92   3            case 3:
+  93   3            {
+  94   4              LCD_ShowNum(1,10,DS1302_Time_DEC[1],2);
+  95   4              LCD_ShowString(2,12,"Date ");
+  96   4              if(KeyNum == 2) DS1302_Time_DEC[2]++;
+*** ERROR C187 IN LINE 96 OF main.c: not an lvalue
+  97   4              if(KeyNum == 3) DS1302_Time_DEC[2]--;
+*** ERROR C187 IN LINE 97 OF main.c: not an lvalue
+  98   4              if(DS1302_Time_DEC[1] == 2)
+  99   4              {
+ 100   5                if(DS1302_Time_DEC[0] % 4 == 0)
+ 101   5                {
+ 102   6                  if(DS1302_Time_DEC[2] > 29) DS1302_Time_DEC[2] = 1;
+ 103   6                  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 29;
+ 104   6                }
+ 105   5                else
+ 106   5                {
+ 107   6                  if(DS1302_Time_DEC[2] > 28) DS1302_Time_DEC[2] = 1;
+ 108   6                  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 28;
+ 109   6                }
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 3   
+
+ 110   5              }
+ 111   4              else if(DS1302_Time_DEC[1] == 4 || DS1302_Time_DEC[1] == 6 || DS1302_Time_DEC[1] == 9 || DS1302_Time_D
+             -EC[1] == 11)
+ 112   4              {
+ 113   5                if(DS1302_Time_DEC[2] > 30) DS1302_Time_DEC[2] = 1;
+ 114   5                if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 30;
+ 115   5              }
+ 116   4              else
+ 117   4              {
+ 118   5                if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 119   5                if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;
+ 120   5              }
+ 121   4              if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 122   4              if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;     
+ 123   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 124   4              if(TimeSetFlashFlag==1){LCD_ShowString(1,13,"  ");}
+ 125   4              else {LCD_ShowNum(1,13,DS1302_Time_DEC[2],2);}
+ 126   4              break;
+ 127   4            }
+ 128   3            case 4:
+ 129   3            {
+ 130   4              LCD_ShowNum(1,13,DS1302_Time_DEC[2],2);
+ 131   4              LCD_ShowString(2,12,"Day  ");
+ 132   4              if(KeyNum == 2) DS1302_Time_DEC[6]++;
+*** ERROR C187 IN LINE 132 OF main.c: not an lvalue
+ 133   4              if(KeyNum == 3) DS1302_Time_DEC[6]--;
+*** ERROR C187 IN LINE 133 OF main.c: not an lvalue
+ 134   4              if(DS1302_Time_DEC[6] > 7) DS1302_Time_DEC[6] = 1;
+ 135   4              if(DS1302_Time_DEC[6] < 1) DS1302_Time_DEC[6] = 7;
+ 136   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 137   4              LCD_ShowNum(1,16,DS1302_Time_DEC[6],1);
+ 138   4              if(TimeSetFlashFlag == 1){LCD_ShowString(1,16,"  ");}
+ 139   4              else {LCD_ShowNum(1,16,DS1302_Time_DEC[6],1);}
+ 140   4              break;
+ 141   4            }
+ 142   3            case 5:
+ 143   3            {
+ 144   4              LCD_ShowNum(1,16,DS1302_Time_DEC[6],1);
+ 145   4              LCD_ShowString(2,12,"Hour ");
+ 146   4              if(KeyNum == 2) DS1302_Time_DEC[3]++;
+*** ERROR C187 IN LINE 146 OF main.c: not an lvalue
+ 147   4              if(KeyNum == 3 && DS1302_Time_DEC[3] != 0) DS1302_Time_DEC[3]--;
+*** ERROR C187 IN LINE 147 OF main.c: not an lvalue
+ 148   4              else if(KeyNum == 3 && DS1302_Time_DEC[3] == 0) DS1302_Time_DEC[3] = 23;
+ 149   4              if(DS1302_Time_DEC[3] > 23) DS1302_Time_DEC[3] = 0;
+ 150   4              // if(DS1302_Time_DEC[3] < 0) DS1302_Time_DEC[3] = 23;
+ 151   4              // if(DS1302_Time_DEC[3] == 0 && KeyNum == 3) DS1302_Time_DEC[3] = 23;
+ 152   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 153   4              if(TimeSetFlashFlag == 1){LCD_ShowString(2,1,"  ");}
+ 154   4              else {LCD_ShowNum(2,1,DS1302_Time_DEC[3],2);}
+ 155   4              break;
+ 156   4            }
+ 157   3            case 6:
+ 158   3            {
+ 159   4              LCD_ShowNum(2,1,DS1302_Time_DEC[3],2);
+ 160   4              LCD_ShowString(2,12,"Min  ");
+ 161   4              if(KeyNum == 2) DS1302_Time_DEC[4]++;
+*** ERROR C187 IN LINE 161 OF main.c: not an lvalue
+ 162   4              if(KeyNum == 3 && DS1302_Time_DEC[4] != 0) DS1302_Time_DEC[4]--;
+*** ERROR C187 IN LINE 162 OF main.c: not an lvalue
+ 163   4              else if(KeyNum == 3 && DS1302_Time_DEC[4] == 0) DS1302_Time_DEC[4] = 59;
+ 164   4              if(DS1302_Time_DEC[4] > 59) DS1302_Time_DEC[4] = 0;
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 4   
+
+ 165   4              // if(DS1302_Time_DEC[4] < 0) DS1302_Time_DEC[4] = 59;
+ 166   4              // if(DS1302_Time_DEC[4] == 0 && KeyNum == 3) DS1302_Time_DEC[4] = 59;
+ 167   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 168   4              if(TimeSetFlashFlag == 1){LCD_ShowString(2,4,"  ");}
+ 169   4              else {LCD_ShowNum(2,4,DS1302_Time_DEC[4],2);}
+ 170   4              break;
+ 171   4            }
+ 172   3            case 7:
+ 173   3            {
+ 174   4              LCD_ShowNum(2,4,DS1302_Time_DEC[4],2);
+ 175   4              LCD_ShowString(2,12,"Sec  ");
+ 176   4              if(KeyNum == 2) DS1302_Time_DEC[5]++;
+*** ERROR C187 IN LINE 176 OF main.c: not an lvalue
+ 177   4              if(KeyNum == 3 && DS1302_Time_DEC[5] !=0) DS1302_Time_DEC[5]--;
+*** ERROR C187 IN LINE 177 OF main.c: not an lvalue
+ 178   4              else if(KeyNum == 3 && DS1302_Time_DEC[5] == 0) DS1302_Time_DEC[5] = 59;
+ 179   4              if(DS1302_Time_DEC[5] > 59) DS1302_Time_DEC[5] = 0;
+ 180   4              // if(DS1302_Time_DEC[5] < 0) DS1302_Time_DEC[5] = 59;
+ 181   4              // if(DS1302_Time_DEC[5] == 0 && KeyNum == 3) DS1302_Time_DEC[5] = 59;
+ 182   4              if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 183   4              if(TimeSetFlashFlag == 1){LCD_ShowString(2,7,"  ");}
+ 184   4              else {LCD_ShowNum(2,7,DS1302_Time_DEC[5],2);}
+ 185   4              break;
+ 186   4            }
+ 187   3            case 8:
+ 188   3            {
+ 189   4              for(i = 0; i < 7; i++)
+ 190   4              {
+ 191   5                DS1302_Time_DEC[i] = DS1302_Time_Backup[i];
+ 192   5              }
+ 193   4              DS1302_SetTime();
+ 194   4              LCD_ShowString(1,7,"  ");
+ 195   4              LCD_ShowNum(2,7,DS1302_Time_DEC[5],2);
+ 196   4              LCD_ShowString(2,12,"     ");
+ 197   4              
+ 198   4              Mode = 0;
+ 199   4              break;
+ 200   4            }
+ 201   3          }
+ 202   2        }
+ 203   1      }
+ 204          
+ 205          void Timer0_Routine() interrupt 1
+ 206          {
+ 207   1        static unsigned int T0Count;
+ 208   1        TL0 = 0x66;   //设置定时初值
+ 209   1        TH0 = 0xFC;   //设置定时初值
+ 210   1        T0Count++;
+ 211   1        if(T0Count>=500)//每500ms进入一次
+ 212   1        {
+ 213   2          T0Count=0;
+ 214   2          TimeSetFlashFlag=!TimeSetFlashFlag;//闪烁标志位取反
+ 215   2        }
+ 216   1      }
+ 217          
+ 218          //K1 切换模式 
+ 219          //M0:显示时间 M1:设置年份 M2:设置月份 M3:设置日期 M4:设置星期 M5:设置时钟 M6:设�
+             -�分钟 M7:设置秒钟 M8:取消设置
+ 220          //K2 增加 K3 减少
+ 221          //K4 保存设置
+ 222          
+ 223          // //加减分开 判断分开
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 5   
+
+ 224          
+ 225          // void DS1302_Time_Check(unsigned char TimeSelect)
+ 226          // {
+ 227          //  switch(TimeSelect)
+ 228          //  // if(DS1302_Time_DEC[0] > 99) DS1302_Time_DEC[0] = 0;
+ 229          //  // if(DS1302_Time_DEC[1] > 12) DS1302_Time_DEC[1] = 1;
+ 230          //  // if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 231          //  // if(DS1302_Time_DEC[3] > 23) DS1302_Time_DEC[3] = 0;
+ 232          //  // if(DS1302_Time_DEC[4] > 59) DS1302_Time_DEC[4] = 0;
+ 233          //  // if(DS1302_Time_DEC[5] > 59) DS1302_Time_DEC[5] = 0;
+ 234          //  // if(DS1302_Time_DEC[6] > 7) DS1302_Time_DEC[6] = 1;
+ 235          
+ 236          //  // if(DS1302_Time_DEC[1] == 2)
+ 237          //  // {
+ 238          //  //  if(DS1302_Time_DEC[0] % 4 == 0)
+ 239          //  //  {
+ 240          //  //    if(DS1302_Time_DEC[2] > 29) DS1302_Time_DEC[2] = 1;
+ 241          //  //    if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 29;
+ 242          //  //  }
+ 243          //  //  else
+ 244          //  //  {
+ 245          //  //    if(DS1302_Time_DEC[2] > 28) DS1302_Time_DEC[2] = 1;
+ 246          //  //    if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 28;
+ 247          //  //  }
+ 248          //  // }
+ 249          //  // else if(DS1302_Time_DEC[1] == 4 || DS1302_Time_DEC[1] == 6 || DS1302_Time_DEC[1] == 9 || DS1302_Tim
+             -e_DEC[1] == 11)
+ 250          //  // {
+ 251          //  //  if(DS1302_Time_DEC[2] > 30) DS1302_Time_DEC[2] = 1;
+ 252          //  //  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 30;
+ 253          //  // }
+ 254          //  // else
+ 255          //  // {
+ 256          //  //  if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 257          //  //  if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;
+ 258          //  // }
+ 259          // }
+ 260          
+ 261          
+ 262          
+ 263          //      case TimeSelect:
+ 264          //      {
+ 265          //        if(KeyNum == 2) DS1302_Time_DEC[TimeSelect]++;
+ 266          //        if(KeyNum == 3 && DS1302_Time_DEC[TimeSelect] != 0) DS1302_Time_DEC[TimeSelect]--;
+ 267          
+ 268          //        else if(KeyNum == 3 && TimeSelect == 1 && DS1302_Time_DEC[TimeSelect] == 0) DS1302_Time_DEC[TimeSel
+             -ect] = 99;
+ 269          //        else if(KeyNum == 3 && TimeSelect == 2 && DS1302_Time_DEC[TimeSelect] == 0) DS1302_Time_DEC[TimeSel
+             -ect] = 12;
+ 270          
+ 271          //        else if(KeyNum == 3 && TimeSelect == 3 && DS1302_Time_DEC[TimeSelect] == 0) DS1302_Time_DEC[TimeSel
+             -ect] = 31;
+ 272          
+ 273          //        else if(KeyNum == 3 && TimeSelect == 4 && DS1302_Time_DEC[TimeSelect] == 0) DS1302_Time_DEC[TimeSel
+             -ect] = 7;
+ 274          //        else if(KeyNum == 3 && TimeSelect == 5 && DS1302_Time_DEC[TimeSelect] == 0) DS1302_Time_DEC[TimeSel
+             -ect] = 23;
+ 275          //        else if(KeyNum == 3 && (TimeSelect == 6 |TimeSelect == 7) && DS1302_Time_DEC[TimeSelect] == 0) DS13
+             -02_Time_DEC[TimeSelect] = 59;
+ 276          //        if(DS1302_Time_DEC[0] > 99) DS1302_Time_DEC[0] = 0;
+ 277          
+ 278          
+C51 COMPILER V9.54   MAIN                                                                  11/28/2024 21:44:58 PAGE 6   
+
+ 279          //        if(KeyNum == 4) {DS1302_SetTime(); Mode = 0;}
+ 280          //        if(TimeSetFlashFlag == 1){LCD_ShowString(1,7,"  ");}
+ 281          //        else {LCD_ShowNum(1,7,DS1302_Time_DEC[0],2);}
+ 282          //        break;
+ 283          //      }
+ 284          
+ 285          //        if(DS1302_Time_DEC[1] == 2)
+ 286          //        {
+ 287          //          if(DS1302_Time_DEC[0] % 4 == 0)
+ 288          //          {
+ 289          //            if(DS1302_Time_DEC[2] > 29) DS1302_Time_DEC[2] = 1;
+ 290          //            if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 29;
+ 291          //          }
+ 292          //          else
+ 293          //          {
+ 294          //            if(DS1302_Time_DEC[2] > 28) DS1302_Time_DEC[2] = 1;
+ 295          //            if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 28;
+ 296          //          }
+ 297          //        }
+ 298          //        else if(DS1302_Time_DEC[1] == 4 || DS1302_Time_DEC[1] == 6 || DS1302_Time_DEC[1] == 9 || DS1302_Tim
+             -e_DEC[1] == 11)
+ 299          //        {
+ 300          //          if(DS1302_Time_DEC[2] > 30) DS1302_Time_DEC[2] = 1;
+ 301          //          if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 30;
+ 302          //        }
+ 303          //        else
+ 304          //        {
+ 305          //          if(DS1302_Time_DEC[2] > 31) DS1302_Time_DEC[2] = 1;
+ 306          //          if(DS1302_Time_DEC[2] < 1) DS1302_Time_DEC[2] = 31;
+ 307          //        }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  15 ERROR(S)

@@ -1,0 +1,91 @@
+{
+  "name": "Project",
+  "type": "C51",
+  "dependenceList": [],
+  "srcDirs": [],
+  "virtualFolder": {
+    "name": "<virtual_root>",
+    "files": [],
+    "folders": [
+      {
+        "name": "Source Group 1",
+        "files": [
+          {
+            "path": "main.c"
+          },
+          {
+            "path": "delay.c"
+          },
+          {
+            "path": "delay.h"
+          },
+          {
+            "path": "LCD1602.c"
+          },
+          {
+            "path": "LCD1602.h"
+          },
+          {
+            "path": "MatrixKey.c"
+          },
+          {
+            "path": "MatrixKey.h"
+          }
+        ],
+        "folders": []
+      }
+    ]
+  },
+  "outDir": "build",
+  "deviceName": null,
+  "packDir": null,
+  "miscInfo": {
+    "uid": "421521d688fde766551aadeb57ce6a5c"
+  },
+  "targets": {
+    "Target 1": {
+      "excludeList": [],
+      "toolchain": "Keil_C51",
+      "compileConfig": {
+        "options": "null"
+      },
+      "uploader": "Custom",
+      "uploadConfig": {
+        "bin": "",
+        "commandLine": "",
+        "eraseChipCommand": ""
+      },
+      "uploadConfigMap": {},
+      "custom_dep": {
+        "name": "default",
+        "incList": [
+          "C:/Keil_v5/C51/INC/Atmel"
+        ],
+        "libList": [],
+        "defineList": []
+      },
+      "builderOptions": {
+        "Keil_C51": {
+          "version": 2,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [],
+          "global": {
+            "ram-mode": "SMALL",
+            "rom-mode": "LARGE"
+          },
+          "c/cpp-compiler": {
+            "optimization-type": "SPEED",
+            "optimization-level": "level-8"
+          },
+          "asm-compiler": {},
+          "linker": {
+            "remove-unused": true,
+            "output-format": "elf",
+            "misc-controls": ""
+          }
+        }
+      }
+    }
+  },
+  "version": "3.5"
+}
