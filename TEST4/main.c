@@ -5,48 +5,61 @@
 #include "Key.h"
 #include "Timer0.h"
 //#include "AT24C02.h"
-// #include "Buzzer.h"
+#include "Buzzer.h"
 #include "nixie.h"
 #include "XPT2046.h"
 
 
 
-sbit Light_Green_A = P2^0;
-sbit Light_Yellow_A = P2^1;
-sbit Light_Red_A = P2^5;
-sbit Light_Green_B = P2^6;
-sbit Light_Yellow_B = P1^4;
-sbit Light_Red_B = P2^7;
-
-// sbit Light_Green_A = P1^0;
-// sbit Light_Yellow_A = P1^1;
-// sbit Light_Red_A = P1^2;
-// sbit Light_Green_B = P1^3;
+// sbit Light_Green_A = P2^0;
+// sbit Light_Yellow_A = P2^1;
+// sbit Light_Red_A = P2^5;
+// sbit Light_Green_B = P2^6;
 // sbit Light_Yellow_B = P1^4;
-// sbit Light_Red_B = P1^5;
+// sbit Light_Red_B = P2^7;
 
-// sbit Buzzer = P2^5;
+sbit Light_Green_A = P1^0;
+sbit Light_Yellow_A = P1^1;
+sbit Light_Red_A = P1^2;
+sbit Light_Green_B = P1^3;
+sbit Light_Yellow_B = P1^4;
+sbit Light_Red_B = P1^6;
+
+sbit Buzzer = P2^5;
 
 unsigned char status;
 unsigned char FlashFlag_Light_Yellow = 0;
 unsigned char FlashFlag_Buzzer = 0;
 unsigned char KeyNum;
-unsigned char CountDown;
+unsigned char CDA,CDB;
 unsigned int ADValue;
 
 
 // Nixie Show CountDown
-void Nixie_CountDown(unsigned char num)
+void Nixie_CountDown()
 {
-	unsigned char i,j;
-	i = num/10;
-	j = num%10;
-	// Nixie(1,i);
-	// Nixie(2,j);
+	//拆分CDA,CDB
+	unsigned char i,j,m,n;
+	i = CDA/10;
+	j = CDA%10;
+	m = CDB/10;
+	n = CDB%10;
+
 	Nixie_SetBuf(7,i);
 	Nixie_SetBuf(8,j);
+	Nixie_SetBuf(1,m);
+	Nixie_SetBuf(2,n);
 }
 
+
+void Nixie_Clear()
+{
+	Nixie_SetBuf(1,10);
+	Nixie_SetBuf(2,10);
+	Nixie_SetBuf(7,10);
+	Nixie_SetBuf(8,10);
+
+}
 void main()
 {
 	Timer0_Init();
@@ -65,7 +78,7 @@ void main()
 				Light_Yellow_B = 1;
 				Light_Red_B = 0;
 				//CountDown
-				Nixie_CountDown(CountDown);
+				Nixie_CountDown();
 				break;
 			}
 			case 1:		// A Yellow
@@ -74,9 +87,9 @@ void main()
 				Light_Yellow_A = FlashFlag_Light_Yellow;
 				//Road B:Do nothing
 				//Buzzer
-				// if(FlashFlag_Light_Yellow) Buzzer_Time(100);
+				if(FlashFlag_Light_Yellow) Buzzer_Time(100);
 				//CountDown
-				Nixie_CountDown(CountDown);
+				Nixie_CountDown();
 				break;
 			}
 			case 2:		//B Green A Red
@@ -87,7 +100,7 @@ void main()
 				Light_Red_B = 1;
 				Light_Green_B = 0;
 				//CountDown
-				Nixie_CountDown(CountDown);
+				Nixie_CountDown();
 				break;
 			}
 			case 3:		// B Yellow
@@ -98,9 +111,9 @@ void main()
 				Light_Yellow_B = FlashFlag_Light_Yellow;
 				//Road A:Do nothing
 				//Buzzer
-				// if(FlashFlag_Light_Yellow) Buzzer_Time(100);
+				if(FlashFlag_Light_Yellow) Buzzer_Time(100);
 				//CountDown
-				Nixie_CountDown(CountDown);
+				Nixie_CountDown();
 				break;
 			}
 			case 4:		//Emergency
@@ -112,9 +125,7 @@ void main()
 				Light_Green_B = 1;
 				Light_Yellow_B = 1;
 				Light_Red_B = 0;
-				//Nixie Clear
-				Nixie_SetBuf(7,10);
-				Nixie_SetBuf(8,10);
+				Nixie_Clear();
 				break;
 			}
 			case 5:		//Night Mode
@@ -126,9 +137,7 @@ void main()
 				Light_Green_B = 1;
 				Light_Red_B = 1;
 				Light_Yellow_B = FlashFlag_Light_Yellow;
-				//Nixie Clear
-				Nixie_SetBuf(7,10);
-				Nixie_SetBuf(8,10);
+				Nixie_Clear();
 				break;
 			}
 		}
@@ -153,7 +162,7 @@ void Timer0_Routine() interrupt 1
 	if(GRCount >= 100){
 		GRCount = 0;
 		ADValue = XPT2046_ReadAD(XPT2046_VBAT);
-		if(ADValue < 50) {NightMode = 1;}
+		if(ADValue < 190) {NightMode = 1;}
 		else {NightMode = 0;}
 
 		if(NightMode && status != 5) {
@@ -173,16 +182,17 @@ void Timer0_Routine() interrupt 1
 	// if(FlashCount >= 500 && (status == 1 || status == 3)) {FlashCount = 0;FlashFlag_Buzzer = ~FlashFlag_Buzzer;}
 	//Light Control
 	if(!NightMode){	
-		if(status == 0 && LightCount >= 5000){LightCount = 0;status = 1;}
-		if(status == 1 && LightCount >= 2000){LightCount = 0;status = 2;}
-		if(status == 2 && LightCount >= 5000){LightCount = 0;status = 3;}
-		if(status == 3 && LightCount >= 2000){LightCount = 0;status = 0;}
+		if(status == 0 && LightCount >= 7000){LightCount = 0;status = 1;}
+		if(status == 1 && LightCount >= 3000){LightCount = 0;status = 2;}
+		if(status == 2 && LightCount >= 7000){LightCount = 0;status = 3;}
+		if(status == 3 && LightCount >= 3000){LightCount = 0;status = 0;}
 	}
 	//Emergency
 	if(status == 4 && LightCount >= 10000){LightCount = 0;status = 0;}
 	//LED Num
 	if(LightCount%1000 == 1) {
-		if(status == 0 || status == 2) CountDown = 5-(LightCount/1000);
-		if(status == 1 || status == 3) CountDown = 2-(LightCount/1000);
+		if(status == 0) {CDA = 7-(LightCount/1000);CDB = 10-(LightCount/1000);}
+		if(status == 2) {CDA = 10-(LightCount/1000);CDB = 7-(LightCount/1000);}
+		if(status == 1 || status == 3) {CDA = 3-(LightCount/1000);CDB = 3-(LightCount/1000);}
 	}
 }

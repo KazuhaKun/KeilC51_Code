@@ -37,9 +37,6 @@ linking...
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
     SEGMENT: ?PR?DS18B20_READT?DS18B20
 
-*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
-    SEGMENT: ?PR?_BUZZER_TIME?BUZZER
-
-Program Size: data=89.1 xdata=0 code=2394
+Program Size: data=92.1 xdata=0 code=2490
 creating hex file from ".\Objects\Project"...
-".\Objects\Project" - 0 Error(s), 13 Warning(s).
+".\Objects\Project" - 0 Error(s), 12 Warning(s).
