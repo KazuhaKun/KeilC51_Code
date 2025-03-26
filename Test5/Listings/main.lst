@@ -1,0 +1,171 @@
+C51 COMPILER V9.54   MAIN                                                                  03/26/2025 21:50:55 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "nixie.h"
+   3          #include "Timer0.h"
+   4          #include "Key.h"
+   5          #include "Buzzer.h"
+   6          #include "XPT2046.h"
+   7          #include "MatrixKey.h"
+   8          
+   9          
+  10          sbit Buzzer = P2^5;
+  11          
+  12          unsigned char mode = 0;
+  13          bit BuzzerFlag = 0;
+  14          bit BeepFlag = 0;
+  15          bit LEDFlag = 0;
+  16          unsigned char LEDLocal = 0;
+  17          unsigned char LEDNum=0;
+  18          unsigned char KeyNum;
+  19          
+  20          unsigned int LEDCounter = 0;
+  21          unsigned int ADValue;
+  22          unsigned int CountSet = 32000;
+  23          
+  24          
+  25          void KeyProc(){
+  26   1          static unsigned char lastKey = 0;
+  27   1          KeyNum = MatrixKey();
+  28   1          
+  29   1          if(KeyNum == 1 && lastKey != 1){
+  30   2              if(mode == 0 || mode == 2) mode = 1;
+  31   2              else mode = 2;
+  32   2              
+  33   2              if(mode == 1) {
+  34   3                  LEDLocal = 0;
+  35   3                  LEDNum = 0;
+  36   3              }
+  37   2          }
+  38   1          
+  39   1          if(KeyNum == 3 && lastKey != 3){
+  40   2              BuzzerFlag = ~BuzzerFlag;
+  41   2          }
+  42   1      
+  43   1        if(KeyNum == 10 && lastKey != 10){
+  44   2          if(CountSet == 32000) CountSet = 64000;
+  45   2          else CountSet = 32000;
+  46   2        }
+  47   1        lastKey = KeyNum;
+  48   1      
+  49   1      }
+  50          
+  51          void Nixie_Init(){
+  52   1        Nixie_SetBuf(1,2,0);
+  53   1        Nixie_SetBuf(2,4,0);
+  54   1        Nixie_SetBuf(3,2,0);
+C51 COMPILER V9.54   MAIN                                                                  03/26/2025 21:50:55 PAGE 2   
+
+  55   1        Nixie_SetBuf(4,1,0);
+  56   1        Nixie_SetBuf(5,1,0);
+  57   1        Nixie_SetBuf(6,9,0);
+  58   1        Nixie_SetBuf(7,2,0);
+  59   1        Nixie_SetBuf(8,0,0);
+  60   1      }
+  61          
+  62          void main()
+  63          {
+  64   1        Timer0_Init();
+  65   1        while(1)
+  66   1        {
+  67   2          switch(mode){
+  68   3            case 0:
+  69   3            {
+  70   4              Nixie_Init();
+  71   4              break;
+  72   4            }
+  73   3            case 1:
+  74   3            {
+  75   4              Nixie_SetBuf(1,0,1);
+  76   4              Nixie_SetBuf(2,5,0);
+  77   4              Nixie_SetBuf(3,ADValue/100%10,0);
+  78   4              Nixie_SetBuf(4,ADValue/10%10,0);
+  79   4              Nixie_SetBuf(5,ADValue%10,0);
+  80   4              Nixie_SetBuf(6,10,0);
+  81   4              Nixie_SetBuf(7,LEDNum/10%10,0);
+  82   4              Nixie_SetBuf(8,LEDNum%10,0);
+  83   4              if(BeepFlag == 1 && BuzzerFlag == 1) Buzzer_Time(100);
+  84   4              break;
+  85   4            }
+  86   3            case 2:
+  87   3            {
+  88   4              Nixie_SetBuf(1,1,1);
+  89   4              Nixie_SetBuf(2,0,0);
+  90   4              Nixie_SetBuf(3,10,0);
+  91   4              Nixie_SetBuf(4,10,0);
+  92   4              Nixie_SetBuf(5,10,0);
+  93   4              Nixie_SetBuf(6,10,0);
+  94   4              Nixie_SetBuf(7,10,0);
+  95   4              Nixie_SetBuf(8,10,0);
+  96   4              break;
+  97   4            }
+  98   3          }
+  99   2        }
+ 100   1      }
+ 101          
+ 102          void Timer0_Routine() interrupt 1
+ 103          {
+ 104   1          static unsigned int Count0,NixieCount,AD_Set;
+ 105   1          TL0 = 0x66; 
+ 106   1          TH0 = 0xFC;
+ 107   1          Count0++;
+ 108   1          NixieCount++;
+ 109   1          if(mode == 1) {
+ 110   2              LEDCounter++;
+ 111   2              if(LEDCounter >= (CountSet/AD_Set)) {  // 500ms
+ 112   3                  LEDCounter = 0;
+ 113   3            
+ 114   3            P2 = ~(0x01 << (7-LEDLocal));
+ 115   3      
+ 116   3                  if(++LEDLocal == 8) LEDLocal = 0;
+C51 COMPILER V9.54   MAIN                                                                  03/26/2025 21:50:55 PAGE 3   
+
+ 117   3                  if(++LEDNum == 100) LEDNum = 0;
+ 118   3                  if(LEDLocal==0) BeepFlag = 1;
+ 119   3            else BeepFlag = 0;
+ 120   3              }
+ 121   2          } 
+ 122   1        else LEDCounter = 0;
+ 123   1          
+ 124   1        // if(Count0 % 2 == 0) Key_Loop();
+ 125   1        // if(Count0 % 2 == 0) KeyProc();
+ 126   1        if(Count0 % 2 == 0) MatrixKey_Loop();
+ 127   1        if(Count0 % 2 == 0) KeyProc();
+ 128   1      
+ 129   1        if(NixieCount % 2 == 0) Nixie_Loop();
+ 130   1        if(NixieCount % 2 == 0) {
+ 131   2          ADValue = XPT2046_ReadAD(XPT2046_XP);
+ 132   2          if(ADValue < 8) ADValue = 8;
+ 133   2          else if(ADValue > 195) ADValue = 196;
+ 134   2          AD_Set = ADValue;
+ 135   2        }
+ 136   1          if(Count0 > 4000 && mode == 0) { Count0 = 0; mode = 1; }
+ 137   1          
+ 138   1          if(Count0 % 1000 == 0 && mode == 2) {
+ 139   2              LEDFlag = ~LEDFlag;
+ 140   2              if(LEDFlag) P2 = 0xff;
+ 141   2              else P2 = 0x00;
+ 142   2          }
+ 143   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    718    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     17    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -9,15 +9,6 @@
 #include "nixie.h"
 #include "XPT2046.h"
 
-
-
-// sbit Light_Green_A = P2^0;
-// sbit Light_Yellow_A = P2^1;
-// sbit Light_Red_A = P2^5;
-// sbit Light_Green_B = P2^6;
-// sbit Light_Yellow_B = P1^4;
-// sbit Light_Red_B = P2^7;
-
 sbit Light_Green_A = P1^0;
 sbit Light_Yellow_A = P1^1;
 sbit Light_Red_A = P1^2;

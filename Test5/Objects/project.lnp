@@ -1,0 +1,16 @@
+".\Objects\main.obj",
+".\Objects\AT24C02.obj",
+".\Objects\Buzzer.obj",
+".\Objects\delay.obj",
+".\Objects\DS18B20.obj",
+".\Objects\I2C.obj",
+".\Objects\Key.obj",
+".\Objects\LCD1602.obj",
+".\Objects\nixie.obj",
+".\Objects\nixieO.obj",
+".\Objects\OneWire.obj",
+".\Objects\Timer0.obj",
+".\Objects\XPT2046.obj",
+".\Objects\MatrixKey.obj" 
+TO ".\Objects\project" 
+PRINT(".\Listings\project.m51") RAMSIZE(256) 
