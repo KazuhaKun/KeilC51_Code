@@ -1,0 +1,105 @@
+C51 COMPILER V9.54   MOTOR                                                                 10/11/2025 00:26:23 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MOTOR
+OBJECT MODULE PLACED IN .\Objects\Motor.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Motor.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\Mot
+                    -or.lst) TABS(2) OBJECT(.\Objects\Motor.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include "Timer1.h"
+   3          #include "main.h"
+   4          
+   5          // 引脚定义
+   6          sbit Motor=P1^0;
+   7          
+   8          unsigned char Counter,Compare;
+   9          
+  10          /**
+  11            * @brief  电机初始化
+  12            * @param  无
+  13            * @retval 无
+  14            */
+  15          void Motor_Init(void)
+  16          {
+  17   1        Timer1_Init();
+  18   1      }
+  19          
+  20          /**
+  21            * @brief  电机设置速度
+  22            * @param  Speed 要设置的速度，范围0~100
+  23            * @retval 无
+  24            */
+  25          void Motor_SetSpeed(unsigned char Speed)
+  26          {
+  27   1        Compare=Speed;
+  28   1      }
+  29          
+  30          //定时器1中断函数
+  31          void Timer1_Routine() interrupt 3
+  32          {
+  33   1        static unsigned char SysTick_1s = 0; // 内部1秒计数（替代原来的SysTick）
+  34   1        TL1 = 0x9C;   //设置定时初值
+  35   1        TH1 = 0xFF;   //设置定时初值
+  36   1        Counter++;
+  37   1        Counter%=100; //计数值变化范围限制在0~99
+  38   1      
+  39   1        // 检查 10ms 周期是否完成 (Counter==0 happens every 10ms)
+  40   1        if(Counter == 0) {
+  41   2              
+  42   2          // 1. 系统 1s 计数 (100 * 10ms = 1000ms)
+  43   2          if (++SysTick_1s >= 100) {
+  44   3            SysTick_1s = 0;
+  45   3            Flag_1s_Task = 1; // 1秒任务标志置位
+  46   3                  
+  47   3            // 2. 5s 任务计数 (基于 1s)
+  48   3            if (++Time_5s_Count >= 5) {
+  49   4              Time_5s_Count = 0;
+  50   4              Flag_5s_Task = 1; // 5秒任务标志置位
+  51   4            }
+  52   3                  
+  53   3            // 3. 60s 任务计数 (基于 1s)
+  54   3            if (++Time_60s_Count >= 60) {
+C51 COMPILER V9.54   MOTOR                                                                 10/11/2025 00:26:23 PAGE 2   
+
+  55   4              Time_60s_Count = 0;
+  56   4              Flag_60s_Task = 1; // 60秒任务标志置位
+  57   4            }
+  58   3          }
+  59   2              
+  60   2              // 4. DS18B20 750ms 非阻塞等待 (75 * 10ms = 750ms)
+  61   2              // 假设你在主循环启动转换后，会进入 Temp_State = 1，并开始计时
+  62   2              if (Temp_State == 1) {
+  63   3                  static unsigned char Delay_750ms = 0;
+  64   3                  if (++Delay_750ms >= 75) {
+  65   4                      Delay_750ms = 0;
+  66   4                      Flag_750ms_Ready = 1; // 750ms 转换完成标志
+  67   4                  }
+  68   3              }
+  69   2        }
+  70   1      
+  71   1        if(Counter<Compare) //计数值小于比较值
+  72   1        {
+  73   2          Motor=1;    //输出1
+  74   2        }
+  75   1        else        //计数值大于比较值
+  76   1        {
+  77   2          Motor=0;    //输出0
+  78   2        }
+  79   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    113    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

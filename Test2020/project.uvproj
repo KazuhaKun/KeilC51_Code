@@ -14,7 +14,7 @@
       <TargetOption>
         <TargetCommonOption>
           <Device>AT89C52</Device>
-          <Vendor>Atmel</Vendor>
+          <Vendor>Microchip</Vendor>
           <Cpu>IRAM(0-0xFF) IROM(0-0x1FFF) CLOCK(24000000)</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile>"LIB\STARTUP.A51" ("Standard 8051 Startup Code")</StartupFile>
@@ -231,7 +231,7 @@
               <RCB>
                 <Type>0</Type>
                 <StartAddress>0x0</StartAddress>
-                <Size>0x10000</Size>
+                <Size>0xffff</Size>
               </RCB>
               <RXB>
                 <Type>0</Type>
@@ -336,7 +336,7 @@
             <DataOverlaying>1</DataOverlaying>
             <OverlayString></OverlayString>
             <MiscControls></MiscControls>
-            <DisableWarningNumbers></DisableWarningNumbers>
+            <DisableWarningNumbers>16</DisableWarningNumbers>
             <LinkerCmdFile></LinkerCmdFile>
             <Assign></Assign>
             <ReserveString></ReserveString>
@@ -368,6 +368,136 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>Delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Delay.c</FilePath>
+            </File>
+            <File>
+              <FileName>Delay.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Delay.h</FilePath>
+            </File>
+            <File>
+              <FileName>Key.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Key.c</FilePath>
+            </File>
+            <File>
+              <FileName>Key.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Key.h</FilePath>
+            </File>
+            <File>
+              <FileName>Nixie.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Nixie.c</FilePath>
+            </File>
+            <File>
+              <FileName>Nixie.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Nixie.h</FilePath>
+            </File>
+            <File>
+              <FileName>Timer1.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Timer1.c</FilePath>
+            </File>
+            <File>
+              <FileName>Timer1.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Timer1.h</FilePath>
+            </File>
+            <File>
+              <FileName>Motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>Motor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Motor.h</FilePath>
+            </File>
+            <File>
+              <FileName>Int0.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Int0.c</FilePath>
+            </File>
+            <File>
+              <FileName>Int0.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Int0.h</FilePath>
+            </File>
+            <File>
+              <FileName>Timer0.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Timer0.c</FilePath>
+            </File>
+            <File>
+              <FileName>Timer0.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Timer0.h</FilePath>
+            </File>
+            <File>
+              <FileName>IR.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\IR.c</FilePath>
+            </File>
+            <File>
+              <FileName>IR.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\IR.h</FilePath>
+            </File>
+            <File>
+              <FileName>DS1302.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\DS1302.c</FilePath>
+            </File>
+            <File>
+              <FileName>DS1302.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\DS1302.h</FilePath>
+            </File>
+            <File>
+              <FileName>AT24C02.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\AT24C02.c</FilePath>
+            </File>
+            <File>
+              <FileName>AT24C02.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\AT24C02.h</FilePath>
+            </File>
+            <File>
+              <FileName>DS18B20.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\DS18B20.c</FilePath>
+            </File>
+            <File>
+              <FileName>DS18B20.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\DS18B20.h</FilePath>
+            </File>
+            <File>
+              <FileName>OneWire.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\OneWire.c</FilePath>
+            </File>
+            <File>
+              <FileName>OneWire.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\OneWire.h</FilePath>
+            </File>
+            <File>
+              <FileName>I2C.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\I2C.c</FilePath>
+            </File>
+            <File>
+              <FileName>I2C.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\I2C.h</FilePath>
             </File>
           </Files>
         </Group>

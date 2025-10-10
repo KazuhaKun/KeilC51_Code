@@ -4,7 +4,8 @@
             "name": "Target 1",
             "includePath": [
                 "C:\\Keil_v5\\C51\\INC",
-                "d:\\Desktop\\Code\\51_achieved\\KeilProject\\17-1 红外遥控"
+                "d:\\Desktop\\Code\\51_achieved\\KeilProject\\Test2020",
+                "${default}"
             ],
             "defines": [
                 "__C51__",
