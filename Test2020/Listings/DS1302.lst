@@ -1,4 +1,4 @@
-C51 COMPILER V9.54   DS1302                                                                10/11/2025 00:32:29 PAGE 1   
+C51 COMPILER V9.54   DS1302                                                                10/13/2025 10:35:14 PAGE 1   
 
 
 C51 COMPILER V9.54, COMPILATION OF MODULE DS1302
@@ -62,7 +62,7 @@ line level    source
   51   2          DS1302_SCLK=1;
   52   2          DS1302_SCLK=0;
   53   2        }
-C51 COMPILER V9.54   DS1302                                                                10/11/2025 00:32:29 PAGE 2   
+C51 COMPILER V9.54   DS1302                                                                10/13/2025 10:35:14 PAGE 2   
 
   54   1        DS1302_CE=0;
   55   1      }
@@ -126,7 +126,7 @@ line level    source
  113   1        DS1302_Time[1]=Temp/16*10+Temp%16;
  114   1        Temp=DS1302_ReadByte(DS1302_DATE);
  115   1        DS1302_Time[2]=Temp/16*10+Temp%16;
-C51 COMPILER V9.54   DS1302                                                                10/11/2025 00:32:29 PAGE 3   
+C51 COMPILER V9.54   DS1302                                                                10/13/2025 10:35:14 PAGE 3   
 
  116   1        Temp=DS1302_ReadByte(DS1302_HOUR);
  117   1        DS1302_Time[3]=Temp/16*10+Temp%16;

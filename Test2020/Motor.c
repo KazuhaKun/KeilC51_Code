@@ -31,14 +31,25 @@ void Motor_SetSpeed(unsigned char Speed)
 void Timer1_Routine() interrupt 3
 {
 	static unsigned char SysTick_1s = 0; // 内部1秒计数（替代原来的SysTick）
-	TL1 = 0x9C;		//设置定时初值
+	static unsigned char SysTick_100ms = 0; // 内部100毫秒计数
+	static unsigned char SysTick_500ms = 0; // 内部500毫秒计数
+	TL1 = 0xA4;		//设置定时初值
 	TH1 = 0xFF;		//设置定时初值
 	Counter++;
 	Counter%=100;	//计数值变化范围限制在0~99
 
 	// 检查 10ms 周期是否完成 (Counter==0 happens every 10ms)
 	if(Counter == 0) {
-        
+		// 0. 100ms 任务计数 (基于 10ms)
+		if (++SysTick_100ms >= 10) {
+			SysTick_100ms = 0;
+			Flag_100ms_Task = 1; // 100毫秒任务标志置位
+		}
+		// 0.5. 500ms 任务计数 (基于 10ms)
+		if (++SysTick_500ms >= 50) {
+			SysTick_500ms = 0;
+			Flag_500ms_Task = 1; // 500毫秒任务标志置位
+		}
 		// 1. 系统 1s 计数 (100 * 10ms = 1000ms)
 		if (++SysTick_1s >= 100) {
 			SysTick_1s = 0;
@@ -48,13 +59,7 @@ void Timer1_Routine() interrupt 3
 			if (++Time_5s_Count >= 5) {
 				Time_5s_Count = 0;
 				Flag_5s_Task = 1; // 5秒任务标志置位
-			}
-            
-			// 3. 60s 任务计数 (基于 1s)
-			if (++Time_60s_Count >= 60) {
-				Time_60s_Count = 0;
-				Flag_60s_Task = 1; // 60秒任务标志置位
-			}
+			}            
 		}
         
         // 4. DS18B20 750ms 非阻塞等待 (75 * 10ms = 750ms)
