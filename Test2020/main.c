@@ -69,6 +69,8 @@ typedef struct {
 // 全局变量，用于保存当前输入状态
 xdata IR_Input_State Current_Input;
 
+bit Cal_Mode = 0; // 0:Display, 1:Set
+
 /*PV End*/
 
 /*Module Code*/
@@ -385,14 +387,27 @@ void Calendar_Set(void){
         // 星期保持不变
         Set_Time[6] = Plause_Time[6]; 
 
-		// 更新 DS1302 时间
+		// 更新 DS1302_Time 数组
 		for(i=0; i<7; i++){
 			DS1302_Time[i] = Set_Time[i];
 		}
-		DS1302_SetTime(); // 设置时间
+        
+		// 设置时间到DS1302芯片
+		DS1302_SetTime();
+        Delay(10); // 等待DS1302写入完成
+        
+        // 读取验证：从DS1302读回时间，确保写入成功
+        DS1302_ReadTime();
+        
+        // 备份时间到 EEPROM
+        for(i=0; i<7; i++){
+            AT24C02_WriteByte(0x00 + i, DS1302_Time[i]); 
+            Delay(5);
+        }
 
 		Cal_Set_Init_Flag = 0; // 重置初始化标志，下次进入重新加载时间
         Current_Input.Input_Finished = 0; // 重置输入完成标志
+        Cal_Mode = 0; // 切换回显示模式
 	}
 	
 }
@@ -406,7 +421,7 @@ void Temp_Proc(void){
     if (Temp_State == 0) { // Idle 状态
         if (Flag_5s_Task) {
             // 开始温度转换，不阻塞
-			P3_5 = 1;
+            P3_5 = 1;
             DS18B20_ConvertT(); // 假设这个函数只是发送启动命令
             Flag_5s_Task = 0;
             Temp_State = 1; // 进入转换中状态
@@ -415,7 +430,7 @@ void Temp_Proc(void){
         if (Flag_750ms_Ready) {
 			float temp;
             // 750ms 等待完成，读取温度
-			P3_5 = 1;
+            P3_5 = 1;
 			temp = DS18B20_ReadT();
 			Temperature_Point = (int)(temp * 100) % 100;
 			Temperature = (int)temp;
@@ -427,46 +442,25 @@ void Temp_Proc(void){
 }
 
 void Calendar_Proc(void){
-	static bit Cal_Mode = 0; // 0:Display, 1:Set
-	unsigned char ir_cmd_temp = 0; // 临时存储 IR_Cmd
-
 	if (mode != Calendar) {return;}
     
-    // 1. 暂存命令并清除 IR_Cmd，防止在 Calendar_Set 中被数字键误触发
-
-    ir_cmd_temp = IR_Cmd;
-    IR_Cmd = 0;
-    
+    if (IR_Cmd == IR_START_STOP) {
+        Cal_Mode = !Cal_Mode; // 切换模式
+        IR_Cmd = 0; // 清除命令，防止重复处理
+    }
+        
 	// 2. 周期性任务处理
     if (Cal_Mode) {
         // 设置模式
-        
-        // --- A. 按键处理 (只处理退出键) ---
-        if (ir_cmd_temp == IR_EQ) {
-            // IR_EQ：保存并退出。首先标记完成，让 Calendar_Set 在本周期执行保存逻辑。
+        // --- A. 按键处理 (只处理保存键) ---
+        if (IR_Cmd == IR_EQ) {
             Current_Input.Input_Finished = 1;
-        } else if (ir_cmd_temp == IR_START_STOP) {
-            // IR_START_STOP：不保存退出。
-            Cal_Mode = 0; // 立即退出
-            Flag_100ms_Task = 1; // 立即刷新
-        } else {
-            // 其他键，如果是数字键，交给 Calendar_Set 处理（IR_Cmd 已经被清空，这里需要恢复）
-            IR_Cmd = ir_cmd_temp; // 恢复 IR_Cmd 给 Calendar_Set 处理数字输入
+            IR_Cmd = 0; // 清除命令，防止重复处理
         }
         
         // --- B. 设置逻辑 (包括输入和保存) ---
 		Calendar_Set();
-        
-        // --- C. 退出逻辑 (如果 Calendar_Set 刚刚完成保存) ---
-        // Calendar_Set 在保存完成时会重置 Current_Input.Input_Finished 为 0。
-        // 如果我们是按 IR_EQ 进来的，我们需要在保存完成后退出。
-        if (ir_cmd_temp == IR_EQ && Cal_Mode == 1) { // 检查是否按了 IR_EQ，并且还没有退出
-             // 检查保存是否成功完成（如果 Calendar_Set 重置了 Cal_Set_Init_Flag，则认为完成）
-             // 最简单的就是按 IR_EQ 后强制退出。由于 Calendar_Set 已经在本周期运行，保存已经完成。
-             Cal_Mode = 0;
-             Flag_100ms_Task = 1; // 立即刷新
-        }
-        
+
         // 500ms 任务：用于闪烁切换
         if (Flag_500ms_Task) {
             Flag_500ms_Task = 0;
@@ -474,14 +468,6 @@ void Calendar_Proc(void){
         
 	} else {
         // 显示模式
-        
-        // --- D. 按键处理 (只处理进入设置键) ---
-        if (ir_cmd_temp == IR_START_STOP) {
-            // 从显示模式进入设置模式
-            Cal_Mode = 1;
-            Flag_100ms_Task = 1; // 立即刷新
-        }
-        
         // --- E. 显示逻辑 ---
         if (Flag_100ms_Task) {
             Calendar_Disp();
@@ -534,7 +520,7 @@ void DS18B20_Test(void)
 void main()
 {
 // ... (保持原样)
-	AT24C02_clearTime();  // 清除 EEPROM 中的时间数据，强制重新初始化
+	// AT24C02_clearTime();  // 清除 EEPROM 中的时间数据，强制重新初始化 - 注释掉以保留设置的时间
 	DS18B20_ConvertT();
 	Delay(750);
 	Temperature = (int)DS18B20_ReadT();
