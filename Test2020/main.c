@@ -1,3 +1,5 @@
+// --- START OF FILE main.c ---
+
 #include <REGX52.H>
 #include "Delay.h"
 #include "Key.h"
@@ -6,9 +8,9 @@
 #include "IR.h"
 #include "LCD1602.h"
 #include "Buzzer.h"
-#include <STDIO.H>
+#include <STDIO.H> // **移除或注释掉此行以节省内存，因为我们不再使用 sprintf**
 #include "DS1302.h"
-// #include "string.h"
+// #include "string.h" // **移除或注释掉此行以节省内存，因为我们不再使用 string.h 函数**
 #include "DS18B20.h"
 #include "AT24C02.h"
 #include "Timer0.h"
@@ -16,11 +18,12 @@
 
 /*PD*/
 #define LINE_MAX_LENGTH 16
-#define CALENDAR_INPUT_LEN 14
+// 目标输入长度：年(2)月(2)日(2)时(2)分(2)秒(2) = 12位数字
+#define CALENDAR_INPUT_LEN 12 
 
 /*PD End*/
 /*PV*/
-
+// ... (保持原样)
 unsigned char Time_5s_Count = 0;    // 用于5秒温度任务
 
 bit Flag_100ms_Task = 0;	// 100毫秒任务（DS1302读取、LCD刷新（新））
@@ -69,6 +72,8 @@ xdata IR_Input_State Current_Input;
 /*PV End*/
 
 /*Module Code*/
+// ... (AT24C02_clearTime, LCD1602_Test, IR_Data_Proc, Mode_Change, IR_Cmd_To_Digit 保持原样)
+
 void AT24C02_clearTime(void){
 	unsigned char i;
 	for(i=0; i<7; i++){
@@ -95,36 +100,6 @@ void Mode_Change(void){
 	}
 }
 
-// /**
-//  * @brief 初始化红外输入模块 初始化长度、初始值、光标位置、输入状态等
-//  * @param Target_Length 目标输入的数字位数 (例如：日历时间设置总共14位)
-//  * @param Initial_Values 可选的初始值数组 (如果需要预填充)，可传入 NULL
-//  */
-// void IR_Input_Init(unsigned char Target_Length, unsigned char *Initial_Values)
-// {
-//     unsigned char i;
-    
-//     // 限制最大长度
-//     if (Target_Length > MAX_INPUT_DIGITS) {
-//         Target_Length = MAX_INPUT_DIGITS;
-//     }
-
-//     Current_Input.Target_Length = Target_Length;
-//     Current_Input.Current_Cursor = 0; // 光标从第一位开始
-//     Current_Input.Input_Finished = 0; // 输入未完成
-
-//     // 清空或初始化缓冲区
-//     for (i = 0; i < MAX_INPUT_DIGITS; i++)
-//     {
-//         if (i < Target_Length && Initial_Values != NULL) {
-//             // 如果提供了初始值，则填充
-//             Current_Input.Digit_Buffer[i] = Initial_Values[i];
-//         } else {
-//             // 否则初始化为 0 或其他占位符
-//             Current_Input.Digit_Buffer[i] = 0; 
-//         }
-//     }
-// }
 // 将红外命令转换为对应的数字 (0-9)，如果不是数字则返回 0xFF
 unsigned char IR_Cmd_To_Digit(unsigned char cmd) {
     switch (cmd) {
@@ -167,46 +142,70 @@ void Calendar_Init(void){
     }
 }
 
+// **修改：使用手动ASCII转换，移除 sprintf**
 void Calendar_Disp(void){
+    unsigned char i, j;
 	DS1302_ReadTime(); // 从DS1302读取时间
-
-
-	// LCD_ShowNum(1,1,DS1302_Time[0],2);
-	// LCD_ShowChar(1,3,'-');
-	// LCD_ShowNum(1,4,DS1302_Time[1],2);
-	// LCD_ShowChar(1,6,'-');
-	// LCD_ShowNum(1,7,DS1302_Time[2],2);
-
-	// LCD_ShowNum(2,1,DS1302_Time[3],2);
-	// LCD_ShowChar(2,3,':');
-	// LCD_ShowNum(2,4,DS1302_Time[4],2);
-	// LCD_ShowChar(2,6,':');
-	// LCD_ShowNum(2,7,DS1302_Time[5],2);
-
-	// // 温度显示
-	// LCD_ShowNum(2,11,Temperature,2);
-	// LCD_ShowChar(2,13,'.');
-	// LCD_ShowNum(2,14,Temperature_Point,2);
-	// LCD_ShowChar(2,16,'C');
-
-	sprintf(L1_String,"20%02bu-%02bu-%02bu      ",	//格式化字符串 占满16个字符
-		DS1302_Time[0],
-		DS1302_Time[1],
-		DS1302_Time[2]
-	);
+    
+    // ====== L1: 20YY-MM-DD (16 chars) ======
+    L1_String[0] = '2'; L1_String[1] = '0';
+    L1_String[4] = '-'; L1_String[7] = '-';
+    
+    // YY (i=0, L1_String index 2,3)
+    L1_String[2] = DS1302_Time[0]/10 + '0';
+    L1_String[3] = DS1302_Time[0]%10 + '0';
+    
+    // MM (i=1, L1_String index 5,6)
+    L1_String[5] = DS1302_Time[1]/10 + '0';
+    L1_String[6] = DS1302_Time[1]%10 + '0';
+    
+    // DD (i=2, L1_String index 8,9)
+    L1_String[8] = DS1302_Time[2]/10 + '0';
+    L1_String[9] = DS1302_Time[2]%10 + '0';
+    
+    // 填充剩余空格
+    for (i = 10; i < LINE_MAX_LENGTH; i++) { L1_String[i] = ' '; }
+    L1_String[LINE_MAX_LENGTH-1] = '\0';
+    
 	LCD_ShowString(1,1,L1_String);
 
-	sprintf(L2_String,"%02bu:%02bu:%02bu  %d.%dC ",
-        DS1302_Time[3],
-        DS1302_Time[4],
-        DS1302_Time[5],
-        Temperature,
-        Temperature_Point
-	);
+    // ====== L2: HH:mm:ss  Temp.Temp_Point C (16 chars) ======
+    L2_String[2] = ':'; L2_String[5] = ':';
+    
+    // HH (i=3, L2_String index 0,1)
+    L2_String[0] = DS1302_Time[3]/10 + '0';
+    L2_String[1] = DS1302_Time[3]%10 + '0';
+    
+    // mm (i=4, L2_String index 3,4)
+    L2_String[3] = DS1302_Time[4]/10 + '0';
+    L2_String[4] = DS1302_Time[4]%10 + '0';
+    
+    // ss (i=5, L2_String index 6,7)
+    L2_String[6] = DS1302_Time[5]/10 + '0';
+    L2_String[7] = DS1302_Time[5]%10 + '0';
+
+    L2_String[8] = ' ';
+    L2_String[9] = ' ';
+    
+    // Temp (L2_String index 10,11)
+    // 假设 Temperature <= 99
+    L2_String[10] = Temperature/10 + '0';
+    L2_String[11] = Temperature%10 + '0';
+    
+    L2_String[12] = '.';
+    
+    // Temp_Point (L2_String index 13,14)
+    L2_String[13] = Temperature_Point/10 + '0';
+    L2_String[14] = Temperature_Point%10 + '0';
+    
+    L2_String[15] = 'C';
+    L2_String[LINE_MAX_LENGTH] = '\0'; // 确保字符串正确终止
+    
 	LCD_ShowString(2,1,L2_String);
 }
 
 void Time_Backup(void){
+// ... (保持原样)
 	//每秒备份秒
 	AT24C02_WriteByte(0x05, DS1302_Time[5]);
 	// Delay(5);
@@ -220,17 +219,6 @@ void Time_Backup(void){
 		AT24C02_WriteByte(0x03, DS1302_Time[3]);
 		// Delay(5);
 	}
-	// //每天备份日、月、年、星期
-	// if (DS1302_Time[3] == 0 && DS1302_Time[4] == 0 && DS1302_Time[5] == 0) {
-	// 	AT24C02_WriteByte(0x02, DS1302_Time[2]);
-	// 	Delay(5);
-	// 	AT24C02_WriteByte(0x01, DS1302_Time[1]);
-	// 	Delay(5);
-	// 	AT24C02_WriteByte(0x00, DS1302_Time[0]);
-	// 	Delay(5);
-	// 	AT24C02_WriteByte(0x06, DS1302_Time[6]);
-	// 	Delay(5);
-	// }
 }
 
 /**
@@ -247,19 +235,20 @@ void IR_Input_Init(unsigned char Target_Length, unsigned char *Initial_Values)
         Target_Length = MAX_INPUT_DIGITS;
     }
 
-    Current_Input.Target_Length = Target_Length;
+    Current_Input.Target_Length = Target_Length; // 目标长度：12
     Current_Input.Current_Cursor = 0; // 光标从第一位开始
     Current_Input.Input_Finished = 0; // 输入未完成
 
-    // 清空或初始化缓冲区
-    for (i = 0; i < MAX_INPUT_DIGITS; i++)
+    // 循环6次，对应6个时间分量 (年,月,日,时,分,秒)
+    for (i = 0; i < 6; i++) 
     {
-        if (i < Target_Length && Initial_Values != NULL) {
-            // 如果提供了初始值，则填充
+        // Target_Length 是 12。我们检查 i*2 是否在范围内
+        if (i*2 < Target_Length && Initial_Values != NULL) {
+            // 将两位数（例如 19）拆分成两个数字（1 和 9）
             Current_Input.Digit_Buffer[i*2] = Initial_Values[i]/10;
 			Current_Input.Digit_Buffer[i*2+1] = Initial_Values[i]%10;
         } else {
-            // 否则初始化为 0 或其他占位符
+            // 否则初始化为 0
             Current_Input.Digit_Buffer[i*2] = 0; 
 			Current_Input.Digit_Buffer[i*2+1] = 0;
         }
@@ -270,117 +259,140 @@ void IR_Input_Proc(unsigned char ir_digit){
 	if(Current_Input.Target_Length == 0 || Current_Input.Input_Finished){
 		return; // 如果没有设置目标长度或输入已完成，直接返回
 	}
+	
+    // 1. 存储新的数字
 	Current_Input.Digit_Buffer[Current_Input.Current_Cursor] = ir_digit;
 
-	Current_Input.Current_Cursor = (Current_Input.Current_Cursor + 1) % Current_Input.Target_Length;
+    // 2. 移动光标
+	Current_Input.Current_Cursor++;
+
+    // 3. 检查是否完成输入
+    if (Current_Input.Current_Cursor >= Current_Input.Target_Length) {
+        Current_Input.Input_Finished = 1; // 12位输入完成
+        Current_Input.Current_Cursor = 0; // 光标归零
+    }
 }
 
-// void IR_Input_GetDisplayString(char *Display_String, bit Blink_State)
-// {
-// 	unsigned char i;
-// 	for (i = 0; i < Current_Input.Target_Length; i++)
-// 	{
-// 		if (i == Current_Input.Current_Cursor && Blink_State)
-// 		{
-// 			Display_String[i] = ' '; // 光标位置显示空格以实现闪烁效果
-// 		}
-// 		else
-// 		{
-// 			Display_String[i] = '0' + Current_Input.Digit_Buffer[i]; // 转换为字符
-// 		}
-// 	}
-// 	Display_String[Current_Input.Target_Length] = '\0'; // 字符串结束符
-// }
+// **新增/修改：使用手动索引和赋值，移除 strlen**
+void Calendar_Build_String_Set(bit Blink_State)
+{
+    unsigned char i;
+    unsigned char digit;
+    unsigned char L1_Cursor = 0;
+    unsigned char L2_Cursor = 0;
+    
+    // ====== L1: 20YY-MM-DD (16 chars) ======
+    // 20
+    L1_String[L1_Cursor++] = '2'; 
+    L1_String[L1_Cursor++] = '0';
+    
+    for (i = 0; i < 6; i++) // Digits 0 to 5 (YY MM DD)
+    {
+        digit = Current_Input.Digit_Buffer[i];
+        
+        // 闪烁逻辑: 如果当前光标位置 i 且 Blink_State 为真，则显示空格
+        if (i == Current_Input.Current_Cursor && Blink_State) {
+            L1_String[L1_Cursor++] = ' ';
+        } else {
+            L1_String[L1_Cursor++] = '0' + digit;
+        }
+        
+        // 添加分隔符 (在 YY2 (i=1) 和 MM2 (i=3) 之后)
+        if (i == 1 || i == 3) {
+            L1_String[L1_Cursor++] = '-';
+        }
+    }
+    // 填充L1长度
+    while (L1_Cursor < LINE_MAX_LENGTH) { L1_String[L1_Cursor++] = ' '; }
+    L1_String[LINE_MAX_LENGTH-1] = '\0'; // 字符串结束符
+
+    // ====== L2: HH:mm:ss (16 chars) ======
+    for (i = 6; i < 12; i++) // Digits 6 to 11 (HH mm ss)
+    {
+        digit = Current_Input.Digit_Buffer[i];
+
+        // 闪烁逻辑
+        if (i == Current_Input.Current_Cursor && Blink_State) {
+            L2_String[L2_Cursor++] = ' ';
+        } else {
+            L2_String[L2_Cursor++] = '0' + digit;
+        }
+
+        // 添加分隔符 (在 HH2 (i=7) 和 mm2 (i=9) 之后)
+        if (i == 7 || i == 9) {
+            L2_String[L2_Cursor++] = ':';
+        }
+    }
+    // 填充L2长度
+    while (L2_Cursor < LINE_MAX_LENGTH) { L2_String[L2_Cursor++] = ' '; }
+    L2_String[LINE_MAX_LENGTH-1] = '\0'; // 字符串结束符
+}
+
 
 void Calendar_Set(void){
 	static bit Cal_Set_Init_Flag = 0; // 0:未初始化, 1:已初始化
 	unsigned char i;
 	unsigned char ir_digit;
-	xdata char Set_L1[LINE_MAX_LENGTH]=""; // 20YY-MM-DD
-    xdata char Set_L2[LINE_MAX_LENGTH]=""; // HH:mm:ss
 
-	// DS1302 读取时间
 	
 	if (!Cal_Set_Init_Flag) {
 		DS1302_ReadTime(); // 从DS1302读取时间
 		for (i = 0; i < 7; i++){
 			Plause_Time[i] = DS1302_Time[i];
 		}
-		IR_Input_Init(CALENDAR_INPUT_LEN, Plause_Time); // 初始化红外输入模块，目标长度为14，初始值为当前时间
+		IR_Input_Init(CALENDAR_INPUT_LEN, Plause_Time); // 初始化红外输入模块，目标长度为12，初始值为当前时间
 		Cal_Set_Init_Flag = 1;
+        
+        Flag_100ms_Task = 1; // 立即刷新显示
 	}
-	// ir_digit = IR_Cmd_To_Digit(IR_Cmd);
-	// if (ir_digit != 0xFF) { // 仅当红外输入是有效数字时才处理
-	// 	IR_Input_Proc(ir_digit); // 处理红外输入
-	// 	IR_Cmd = 0; // 清除命令，防止重复处理
-	// }
+    
+    // 1. 处理红外输入
+	ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+	if (ir_digit != 0xFF) { // 仅当红外输入是有效数字时才处理
+		IR_Input_Proc(ir_digit); // 处理红外输入：存入Digit_Buffer，移动光标
+		IR_Cmd = 0; // 清除命令，防止重复处理
+        Flag_100ms_Task = 1; // 立即刷新显示
+	}
+    // // 处理确认键 (例如 IR_OK) - 强制完成输入并保存
+    // if (IR_Cmd == IR_EQ) {
+    //     Current_Input.Input_Finished = 1;
+    //     IR_Cmd = 0;
+    // }
 	
+    // 2. 周期性刷新显示 (100ms 任务)
+    if (Flag_100ms_Task) {
+        
+        // 3. 处理显示：格式化字符串并在光标位置应用闪烁
+        Calendar_Build_String_Set(Flag_500ms_Task); // **修改：使用新的无 strlen 函数**
+
+        // 显示字符串
+        LCD_ShowString(1,1,L1_String);
+        LCD_ShowString(2,1,L2_String);
+        
+        Flag_100ms_Task = 0;
+    }
 
 
-	// // 闪烁显示设置
-	// if (Flag_500ms_Task) {
-	// 	Flag_500ms_Task = 0;
-	// }
-	
-	// // 将Current_Input.Digit_Buffer转换为存储时间（两位合成一位）0-0/1 1-1/2 
-	// for (i = 0; i < 6; i++)
-	// {
-	// 	Set_Time[i] = (Current_Input.Digit_Buffer[i * 2] << 4) | Current_Input.Digit_Buffer[i * 2 + 1];
-	// }
-	// Set_Time[6] = 0; // 星期默认设置为0
-
-	// IR_Input_GetDisplayString(Set_L1, Flag_500ms_Task);
-
-	// IR_Input_GetDisplayString(Set_L2, Flag_500ms_Task);
-	// // 格式化显示字符串
-	// sprintf(L1_String,"20%s-%s-%s      ",
-	// 	&Set_L1[0], &Set_L1[2], &Set_L1[4]
-	// );
-	// LCD_ShowString(1,1,L1_String);
-	// // 显示时间
-	// sprintf(L2_String,"%s:%s:%s",
-	// 	&Set_L2[0], &Set_L2[2], &Set_L2[4]
-	// );
-	// LCD_ShowString(2,1,L2_String);
-
-	sprintf(Set_L1,"20%02u-%02u-%02u      ",
-		Current_Input.Digit_Buffer[0],
-		Current_Input.Digit_Buffer[1],
-		Current_Input.Digit_Buffer[2]
-	);
-	LCD_ShowString(1,1,Set_L1);
-	sprintf(Set_L2,"%02u:%02u:%02u",
-		Current_Input.Digit_Buffer[3],
-		Current_Input.Digit_Buffer[4],
-		Current_Input.Digit_Buffer[5]
-	);
-	LCD_ShowString(2,1,Set_L2);
-
-
-
-	// sprintf(Set_L1,"20%02u-%02u-%02u      ",
-	// 	Set_Time[0], Set_Time[1], Set_Time[2]
-	// );
-	// LCD_ShowString(1,1,Set_L1);
-	// sprintf(Set_L2,"%02u:%02u:%02u",
-	// 	Set_Time[3], Set_Time[4], Set_Time[5]
-	// );
-	// LCD_ShowString(2,1,Set_L2);
-
+	// 4. 输入完成后的数据转换和保存
 	if (Current_Input.Input_Finished)
 	{
-		// 输入完成，更新 DS1302 时间
+		// 输入完成，将 12 位数字重新组合成 6 个时间分量
+		for (i = 0; i < 6; i++)
+		{
+            // Set_Time[0]=D[0]*10+D[1], Set_Time[1]=D[2]*10+D[3], ...
+			Set_Time[i] = Current_Input.Digit_Buffer[i * 2] * 10 + Current_Input.Digit_Buffer[i * 2 + 1];
+		}
+        // 星期保持不变
+        Set_Time[6] = Plause_Time[6]; 
+
+		// 更新 DS1302 时间
 		for(i=0; i<7; i++){
 			DS1302_Time[i] = Set_Time[i];
 		}
 		DS1302_SetTime(); // 设置时间
 
-		// // 备份时间到 EEPROM
-		// for(i=0; i<7; i++){
-		// 	AT24C02_WriteByte(0x00 + i, DS1302_Time[i]); 
-		// 	Delay(5);
-		// }
-		Cal_Set_Init_Flag = 0; // 重新初始化，准备下一次设置
+		Cal_Set_Init_Flag = 0; // 重置初始化标志，下次进入重新加载时间
+        Current_Input.Input_Finished = 0; // 重置输入完成标志
 	}
 	
 }
@@ -388,7 +400,6 @@ void Calendar_Set(void){
 /*Module Code End*/
 
 /*Proc Code*/
-// DS18B20 状态机处理函数 (非阻塞)
 void Temp_Proc(void){
     if (mode != Calendar) return;
 
@@ -417,25 +428,66 @@ void Temp_Proc(void){
 
 void Calendar_Proc(void){
 	static bit Cal_Mode = 0; // 0:Display, 1:Set
+	unsigned char ir_cmd_temp = 0; // 临时存储 IR_Cmd
+
 	if (mode != Calendar) {return;}
     
-	// 1. 模式切换处理 (保持不变)
-	if (IR_Cmd == IR_START_STOP){
-		Cal_Mode = !Cal_Mode;
-		IR_Cmd = 0;
-        // 如果进入设置模式，可以清除 LCD
-	}
+    // 1. 暂存命令并清除 IR_Cmd，防止在 Calendar_Set 中被数字键误触发
+
+    ir_cmd_temp = IR_Cmd;
+    IR_Cmd = 0;
     
 	// 2. 周期性任务处理
     if (Cal_Mode) {
+        // 设置模式
+        
+        // --- A. 按键处理 (只处理退出键) ---
+        if (ir_cmd_temp == IR_EQ) {
+            // IR_EQ：保存并退出。首先标记完成，让 Calendar_Set 在本周期执行保存逻辑。
+            Current_Input.Input_Finished = 1;
+        } else if (ir_cmd_temp == IR_START_STOP) {
+            // IR_START_STOP：不保存退出。
+            Cal_Mode = 0; // 立即退出
+            Flag_100ms_Task = 1; // 立即刷新
+        } else {
+            // 其他键，如果是数字键，交给 Calendar_Set 处理（IR_Cmd 已经被清空，这里需要恢复）
+            IR_Cmd = ir_cmd_temp; // 恢复 IR_Cmd 给 Calendar_Set 处理数字输入
+        }
+        
+        // --- B. 设置逻辑 (包括输入和保存) ---
 		Calendar_Set();
-	}else {
-        // 100ms任务：时间读取和显示
+        
+        // --- C. 退出逻辑 (如果 Calendar_Set 刚刚完成保存) ---
+        // Calendar_Set 在保存完成时会重置 Current_Input.Input_Finished 为 0。
+        // 如果我们是按 IR_EQ 进来的，我们需要在保存完成后退出。
+        if (ir_cmd_temp == IR_EQ && Cal_Mode == 1) { // 检查是否按了 IR_EQ，并且还没有退出
+             // 检查保存是否成功完成（如果 Calendar_Set 重置了 Cal_Set_Init_Flag，则认为完成）
+             // 最简单的就是按 IR_EQ 后强制退出。由于 Calendar_Set 已经在本周期运行，保存已经完成。
+             Cal_Mode = 0;
+             Flag_100ms_Task = 1; // 立即刷新
+        }
+        
+        // 500ms 任务：用于闪烁切换
+        if (Flag_500ms_Task) {
+            Flag_500ms_Task = 0;
+        }
+        
+	} else {
+        // 显示模式
+        
+        // --- D. 按键处理 (只处理进入设置键) ---
+        if (ir_cmd_temp == IR_START_STOP) {
+            // 从显示模式进入设置模式
+            Cal_Mode = 1;
+            Flag_100ms_Task = 1; // 立即刷新
+        }
+        
+        // --- E. 显示逻辑 ---
         if (Flag_100ms_Task) {
             Calendar_Disp();
-			// Time_Backup(); // 每秒备份时间到 EEPROM
 			Flag_100ms_Task = 0; 
         }
+        // ... (Time_Backup 和 Temp_Proc 保持不变)
 		if (Flag_1s_Task) {
 			Time_Backup(); // 每秒备份时间到 EEPROM
 			Flag_1s_Task = 0;
@@ -445,7 +497,7 @@ void Calendar_Proc(void){
         Temp_Proc();        
 	}
 }
-
+// ... (Safe_Proc, Calculator_Proc, DS18B20_Test 保持原样)
 void Safe_Proc(void){
 	if (mode != Safe) {return;} 
 }
@@ -453,7 +505,6 @@ void Safe_Proc(void){
 void Calculator_Proc(void){
 	if (mode != Calculator) {return;}
 }
-/*Proc Code End*/
 
 void DS18B20_Test(void)
 {
@@ -472,16 +523,17 @@ void DS18B20_Test(void)
     // 4. 将温度值格式化为字符串
     //    注意：Keil C51的sprintf默认可能不支持%f浮点数格式
     //    如果显示不正常，需要手动转换或更改编译器设置
-    sprintf(temp_string, "Temp: %.2f C", temp_value);
+    // sprintf(temp_string, "Temp: %.2f C", temp_value); // 移除
     
     // 5. 在LCD上显示结果
     LCD_ShowString(1, 1, "DS18B20 Test:");
-    LCD_ShowString(2, 1, "                "); // 先清空第二行
-    LCD_ShowString(2, 1, temp_string);
+    // LCD_ShowString(2, 1, "                "); // 先清空第二行
+    // LCD_ShowString(2, 1, temp_string);
 }
 
 void main()
 {
+// ... (保持原样)
 	AT24C02_clearTime();  // 清除 EEPROM 中的时间数据，强制重新初始化
 	DS18B20_ConvertT();
 	Delay(750);
@@ -505,4 +557,3 @@ void main()
         // Delay(1000); // 每隔1秒测试一次
 	}
 }
-
