@@ -8,9 +8,7 @@
 #include "IR.h"
 #include "LCD1602.h"
 #include "Buzzer.h"
-#include <STDIO.H> // **移除或注释掉此行以节省内存，因为我们不再使用 sprintf**
 #include "DS1302.h"
-// #include "string.h" // **移除或注释掉此行以节省内存，因为我们不再使用 string.h 函数**
 #include "DS18B20.h"
 #include "AT24C02.h"
 #include "Timer0.h"
@@ -23,7 +21,6 @@
 
 /*PD End*/
 /*PV*/
-// ... (保持原样)
 unsigned char Time_5s_Count = 0;    // 用于5秒温度任务
 
 bit Flag_100ms_Task = 0;	// 100毫秒任务（DS1302读取、LCD刷新（新））
@@ -41,8 +38,6 @@ typedef enum {
 	Calculator
 } Mode;
 Mode mode=Calendar;
-
-
 
 unsigned char IR_Cmd=0;
 
@@ -71,6 +66,33 @@ xdata IR_Input_State Current_Input;
 
 bit Cal_Mode = 0; // 0:Display, 1:Set
 
+/*===== 密码相关变量 =====*/
+#define PASSWORD_LENGTH 8  // 密码长度为8位
+xdata unsigned char Saved_Password[PASSWORD_LENGTH];  // 保存的密码
+xdata unsigned char Input_Password[PASSWORD_LENGTH];   // 输入的密码
+bit Safe_Mode = 0;  // 0:验证密码, 1:设置密码
+bit Password_Verified = 0;  // 密码验证成功标志
+bit Password_Error = 0;     // 密码错误标志
+
+// EEPROM地址定义
+#define EEPROM_PASSWORD_ADDR 0x10  // 密码存储起始地址(0x10-0x17)
+#define EEPROM_PASSWORD_INIT_FLAG 0x18  // 密码初始化标志地址
+
+/*===== 计算器相关变量 =====*/
+typedef enum {
+    CALC_INPUT_NUM1,    // 输入第一个数
+    CALC_SELECT_OP,     // 选择运算符
+    CALC_INPUT_NUM2,    // 输入第二个数
+    CALC_SHOW_RESULT    // 显示结果
+} Calc_State;
+
+xdata Calc_State Calc_Current_State = CALC_INPUT_NUM1;
+xdata long Calc_Num1 = 0;
+xdata long Calc_Num2 = 0;
+xdata unsigned char Calc_Operator = 0;
+xdata float Calc_Result = 0.0;
+xdata unsigned char Calc_Input_Count = 0;
+
 /*PV End*/
 
 /*Module Code*/
@@ -82,10 +104,6 @@ void AT24C02_clearTime(void){
 		AT24C02_WriteByte(0x00 + i, 0x00); 	
 		Delay(5);
 	}
-}
-void LCD1602_Test(void){
-	LCD_ShowString(1,1,"Hello,World!    ");
-	LCD_ShowString(2,1,"LCD1602 Test    ");
 }
 
 void IR_Data_Proc(void)
@@ -119,6 +137,292 @@ unsigned char IR_Cmd_To_Digit(unsigned char cmd) {
     }
 }
 
+/*===== 密码功能函数 =====*/
+
+/**
+ * @brief 初始化密码系统
+ * 从EEPROM读取密码，如果未初始化则设置默认密码12345678
+ */
+void Password_Init(void) {
+    unsigned char i;
+    unsigned char init_flag;
+    
+    // 读取初始化标志
+    init_flag = AT24C02_ReadByte(EEPROM_PASSWORD_INIT_FLAG);
+    
+    if (init_flag != 0xAA) {
+        // 首次使用，设置默认密码 12345678
+        for (i = 0; i < PASSWORD_LENGTH; i++) {
+            Saved_Password[i] = (i + 1) % 10; // 12345678
+            AT24C02_WriteByte(EEPROM_PASSWORD_ADDR + i, Saved_Password[i]);
+            Delay(5);
+        }
+        // 设置初始化标志
+        AT24C02_WriteByte(EEPROM_PASSWORD_INIT_FLAG, 0xAA);
+        Delay(5);
+    } else {
+        // 从EEPROM读取密码
+        for (i = 0; i < PASSWORD_LENGTH; i++) {
+            Saved_Password[i] = AT24C02_ReadByte(EEPROM_PASSWORD_ADDR + i);
+        }
+    }
+}
+
+/**
+ * @brief 保存密码到EEPROM
+ */
+void Password_Save(void) {
+    unsigned char i;
+    for (i = 0; i < PASSWORD_LENGTH; i++) {
+        AT24C02_WriteByte(EEPROM_PASSWORD_ADDR + i, Saved_Password[i]);
+        Delay(5);
+    }
+}
+
+/**
+ * @brief 验证密码是否正确
+ * @return 1:正确, 0:错误
+ */
+bit Password_Verify(void) {
+    unsigned char i;
+    for (i = 0; i < PASSWORD_LENGTH; i++) {
+        if (Input_Password[i] != Saved_Password[i]) {
+            return 0; // 密码错误
+        }
+    }
+    return 1; // 密码正确
+}
+
+/**
+ * @brief 显示密码输入界面
+ * @param is_setting 1:设置密码, 0:验证密码
+ */
+void Password_Display(bit is_setting) {
+    unsigned char i;
+    
+    // 第一行显示提示
+    if (is_setting) {
+        LCD_ShowString(1, 1, "Set Password:   ");
+    } else {
+        LCD_ShowString(1, 1, "Enter Password: ");
+    }
+    
+    // 第二行显示已输入的密码（用*或数字显示）
+    for (i = 0; i < PASSWORD_LENGTH; i++) {
+        if (i < Current_Input.Current_Cursor) {
+            // 已输入的位置显示星号
+            LCD_ShowChar(2, i + 1, '*');
+        } else if (i == Current_Input.Current_Cursor && Flag_500ms_Task) {
+            // 当前光标位置闪烁
+            LCD_ShowChar(2, i + 1, '_');
+        } else {
+            // 未输入的位置显示下划线
+            LCD_ShowChar(2, i + 1, '-');
+        }
+    }
+    // 清除多余字符
+    for (i = PASSWORD_LENGTH + 1; i <= 16; i++) {
+        LCD_ShowChar(2, i, ' ');
+    }
+}
+
+/**
+ * @brief 步进电机正转5圈后反转5圈（预留接口）
+ */
+void Motor_OpenDoor(void) {
+    // TODO: 实现步进电机控制
+    // 正转5圈
+    // Delay(...)
+    // 反转5圈
+    
+    LCD_ShowString(1, 1, "Door Opened!    ");
+    LCD_ShowString(2, 1, "Motor Running..."); 
+    Delay(3000); // 模拟电机运行时间
+}
+
+/**
+ * @brief 蜂鸣器报警3秒（预留接口）
+ */
+void Buzzer_Alarm(void) {
+    // TODO: 实现蜂鸣器控制
+    // 报警3秒
+    
+    LCD_ShowString(1, 1, "Wrong Password! ");
+    LCD_ShowString(2, 1, "Buzzer Alarm... ");
+    Delay(3000); // 模拟蜂鸣器报警3秒
+}
+
+/*===== 计算器功能函数 =====*/
+
+void Calculator_Reset(void) {
+    Calc_Num1 = 0;
+    Calc_Num2 = 0;
+    Calc_Operator = 0;
+    Calc_Result = 0.0;
+    Calc_Input_Count = 0;
+    Calc_Current_State = CALC_INPUT_NUM1;
+}
+
+/**
+ * @brief 显示数字到LCD（支持最多8位）
+ * @param num 要显示的数字
+ * @param line LCD行号(1或2)
+ * @param start_col 起始列号
+ */
+void Calculator_ShowNumber(long num, unsigned char line, unsigned char start_col) {
+    unsigned char i;
+    unsigned char digits[8];
+    unsigned char digit_count = 0;
+    long temp = num;
+    bit is_negative = 0;
+    
+    // 处理负数
+    if (num < 0) {
+        is_negative = 1;
+        temp = -num;
+    }
+    
+    // 提取每一位数字
+    if (temp == 0) {
+        digits[0] = 0;
+        digit_count = 1;
+    } else {
+        while (temp > 0 && digit_count < 8) {
+            digits[digit_count++] = temp % 10;
+            temp /= 10;
+        }
+    }
+    
+    // 显示负号
+    if (is_negative) {
+        LCD_ShowChar(line, start_col++, '-');
+    }
+    
+    // 反向显示数字
+    for (i = digit_count; i > 0; i--) {
+        LCD_ShowChar(line, start_col++, '0' + digits[i-1]);
+    }
+}
+
+void Calculator_ShowResult(float result) {
+    long integer_part;
+    unsigned int decimal_part;
+    unsigned char pos;
+    unsigned char i;
+    
+    LCD_ShowString(1, 1, "Res:            ");
+    
+    pos = 1;
+    
+    // 处理负数
+    if (result < 0) {
+        LCD_ShowChar(2, pos++, '-');
+        result = -result;
+    }
+    
+    integer_part = (long)result;
+    decimal_part = (unsigned int)((result - integer_part) * 10000);
+    
+    // 显示整数部分
+    Calculator_ShowNumber(integer_part, 2, pos);
+    
+    // 计算整数部分占用的位置
+    if (integer_part == 0) {
+        pos += 1;
+    } else {
+        long temp = integer_part;
+        while (temp > 0) {
+            temp /= 10;
+            pos++;
+        }
+    }
+    
+    // 只在除法时显示小数部分
+    if (Calc_Operator == 4 && pos < 11) {
+        LCD_ShowChar(2, pos++, '.');
+        LCD_ShowChar(2, pos++, '0' + (decimal_part / 1000) % 10);
+        LCD_ShowChar(2, pos++, '0' + (decimal_part / 100) % 10);
+        LCD_ShowChar(2, pos++, '0' + (decimal_part / 10) % 10);
+        LCD_ShowChar(2, pos++, '0' + decimal_part % 10);
+    }
+    
+    // 清除第二行剩余部分
+    for (i = pos; i <= 16; i++) {
+        LCD_ShowChar(2, i, ' ');
+    }
+}
+
+void Calculator_Calculate(void) {
+    switch (Calc_Operator) {
+        case 1:
+            Calc_Result = (float)Calc_Num1 + (float)Calc_Num2;
+            break;
+        case 2:
+            Calc_Result = (float)Calc_Num1 - (float)Calc_Num2;
+            break;
+        case 3:
+            Calc_Result = (float)Calc_Num1 * (float)Calc_Num2;
+            break;
+        case 4:
+            if (Calc_Num2 != 0) {
+                Calc_Result = (float)Calc_Num1 / (float)Calc_Num2;
+            } else {
+                LCD_ShowString(1, 1, "Err:Div by 0    ");
+                LCD_ShowString(2, 1, "                ");
+                Delay(1500);
+                Calculator_Reset();
+                return;
+            }
+            break;
+        default:
+            return;
+    }
+    
+    Calculator_ShowResult(Calc_Result);
+    Calc_Current_State = CALC_SHOW_RESULT;
+}
+
+/**
+ * @brief 显示当前输入状态
+ */
+void Calculator_Display(void) {
+    unsigned char i;
+    
+    switch (Calc_Current_State) {
+        case CALC_INPUT_NUM1:
+            LCD_ShowString(1, 1, "Num1:           ");
+            if (Calc_Input_Count > 0) {
+                Calculator_ShowNumber(Calc_Num1, 1, 6);
+            }
+            LCD_ShowString(2, 1, "                ");
+            break;
+            
+        case CALC_SELECT_OP:
+            LCD_ShowString(1, 1, "Select Op:      ");
+            LCD_ShowString(2, 1, "+  -  *  /      ");
+            break;
+            
+        case CALC_INPUT_NUM2:
+            LCD_ShowString(1, 1, "Num2:           ");
+            if (Calc_Input_Count > 0) {
+                Calculator_ShowNumber(Calc_Num2, 1, 6);
+            }
+            // 显示运算符在第二行
+            LCD_ShowChar(2, 1, Calc_Operator == 1 ? '+' : 
+                               Calc_Operator == 2 ? '-' : 
+                               Calc_Operator == 3 ? '*' : '/');
+            // 清除第二行其余部分
+            for (i = 2; i <= 16; i++) {
+                LCD_ShowChar(2, i, ' ');
+            }
+            break;
+            
+        case CALC_SHOW_RESULT:
+            // 结果已在 Calculate 函数中显示
+            return;
+    }
+}
+
 void Calendar_Init(void){
     unsigned char i;
 	DS1302_Init();
@@ -146,7 +450,7 @@ void Calendar_Init(void){
 
 // **修改：使用手动ASCII转换，移除 sprintf**
 void Calendar_Disp(void){
-    unsigned char i, j;
+    unsigned char i;
 	DS1302_ReadTime(); // 从DS1302读取时间
     
     // ====== L1: 20YY-MM-DD (16 chars) ======
@@ -245,7 +549,7 @@ void IR_Input_Init(unsigned char Target_Length, unsigned char *Initial_Values)
     for (i = 0; i < 6; i++) 
     {
         // Target_Length 是 12。我们检查 i*2 是否在范围内
-        if (i*2 < Target_Length && Initial_Values != NULL) {
+        if (i*2 < Target_Length && Initial_Values != 0) {
             // 将两位数（例如 19）拆分成两个数字（1 和 9）
             Current_Input.Digit_Buffer[i*2] = Initial_Values[i]/10;
 			Current_Input.Digit_Buffer[i*2+1] = Initial_Values[i]%10;
@@ -327,7 +631,7 @@ void Calendar_Build_String_Set(bit Blink_State)
     }
     // 填充L2长度
     while (L2_Cursor < LINE_MAX_LENGTH) { L2_String[L2_Cursor++] = ' '; }
-    L2_String[LINE_MAX_LENGTH-1] = '\0'; // 字符串结束符
+    L2_String[LINE_MAX_LENGTH] = '\0'; // 字符串结束符
 }
 
 
@@ -352,7 +656,7 @@ void Calendar_Set(void){
 	ir_digit = IR_Cmd_To_Digit(IR_Cmd);
 	if (ir_digit != 0xFF) { // 仅当红外输入是有效数字时才处理
 		IR_Input_Proc(ir_digit); // 处理红外输入：存入Digit_Buffer，移动光标
-		IR_Cmd = 0; // 清除命令，防止重复处理
+		IR_Cmd = 0xFF; // 清除命令，防止重复处理
         Flag_100ms_Task = 1; // 立即刷新显示
 	}
     // // 处理确认键 (例如 IR_OK) - 强制完成输入并保存
@@ -485,36 +789,239 @@ void Calendar_Proc(void){
 }
 // ... (Safe_Proc, Calculator_Proc, DS18B20_Test 保持原样)
 void Safe_Proc(void){
-	if (mode != Safe) {return;} 
+    static bit Safe_Init_Flag = 0;
+    unsigned char ir_digit;
+    
+	if (mode != Safe) {
+        Safe_Init_Flag = 0;
+        return;
+    } 
+    
+    // 初始化
+    if (!Safe_Init_Flag) {
+        // 初始化输入模块
+        IR_Input_Init(PASSWORD_LENGTH, 0); // 8位密码，不预填充
+        Safe_Mode = 0; // 默认为验证密码模式
+        Password_Verified = 0;
+        Password_Error = 0;
+        Safe_Init_Flag = 1;
+        Flag_100ms_Task = 1; // 立即刷新显示
+    }
+    
+    // 按键处理
+    if (IR_Cmd == IR_START_STOP) {
+        // 切换设置/验证模式
+        Safe_Mode = !Safe_Mode;
+        IR_Input_Init(PASSWORD_LENGTH, 0); // 重新初始化输入
+        Password_Verified = 0;
+        Password_Error = 0;
+        IR_Cmd = 0;
+        Flag_100ms_Task = 1;
+    }
+    
+    // 处理数字输入
+    ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+    if (ir_digit != 0xFF) {
+        // 存储输入的数字
+        if (Safe_Mode) {
+            // 设置密码模式
+            Saved_Password[Current_Input.Current_Cursor] = ir_digit;
+        } else {
+            // 验证密码模式
+            Input_Password[Current_Input.Current_Cursor] = ir_digit;
+        }
+        
+        IR_Input_Proc(ir_digit); // 移动光标
+        IR_Cmd = 0;
+        Flag_100ms_Task = 1;
+    }
+    
+    // 处理确认键
+    if (IR_Cmd == IR_EQ) {
+        Current_Input.Input_Finished = 1;
+        IR_Cmd = 0;
+    }
+    
+    // 周期性刷新显示
+    if (Flag_100ms_Task) {
+        Password_Display(Safe_Mode);
+        Flag_100ms_Task = 0;
+    }
+    
+    // 输入完成处理
+    if (Current_Input.Input_Finished) {
+        if (Safe_Mode) {
+            // 设置密码模式：保存密码
+            Password_Save();
+            LCD_ShowString(1, 1, "Password Saved! ");
+            LCD_ShowString(2, 1, "                ");
+            Delay(1500);
+            Safe_Mode = 0; // 切换回验证模式
+        } else {
+            // 验证密码模式
+            if (Password_Verify()) {
+                // 密码正确
+                Password_Verified = 1;
+                LCD_ShowString(1, 1, "Password OK!    ");
+                LCD_ShowString(2, 1, "Opening Door... ");
+                Delay(1000);
+                
+                // 调用步进电机开门函数
+                Motor_OpenDoor();
+                
+                Password_Verified = 0;
+            } else {
+                // 密码错误
+                Password_Error = 1;
+                
+                // 调用蜂鸣器报警函数
+                Buzzer_Alarm();
+                
+                Password_Error = 0;
+            }
+        }
+        
+        // 重新初始化输入
+        IR_Input_Init(PASSWORD_LENGTH, 0);
+        Current_Input.Input_Finished = 0;
+        Flag_100ms_Task = 1;
+    }
 }
 
 void Calculator_Proc(void){
-	if (mode != Calculator) {return;}
-}
-
-void DS18B20_Test(void)
-{
-    float temp_value;
-    char temp_string[16];
+    static bit Calc_Init_Flag = 0;
+    unsigned char ir_digit;
     
-    // 1. 启动温度转换
-    DS18B20_ConvertT();
+	if (mode != Calculator) {
+        Calc_Init_Flag = 0;
+        return;
+    }
     
-    // 2. 等待转换完成 (DS18B20需要约750ms)
-    Delay(750);
+    // 初始化
+    if (!Calc_Init_Flag) {
+        Calculator_Reset();
+        Calc_Init_Flag = 1;
+        Flag_100ms_Task = 1;
+    }
     
-    // 3. 读取温度值
-    temp_value = DS18B20_ReadT();
+    // 处理按键
+    switch (Calc_Current_State) {
+        case CALC_INPUT_NUM1:
+            // 输入第一个数字（最多8位或乘法时4位）
+            ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+            if (ir_digit != 0xFF) {
+                Calc_Num1 = Calc_Num1 * 10 + ir_digit;
+                Calc_Input_Count++;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            
+            // 按EQ确认输入，进入选择运算符状态
+            if (IR_Cmd == IR_EQ) {
+                Calc_Current_State = CALC_SELECT_OP;
+                Calc_Input_Count = 0;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            
+            // 按VOL-清除当前输入
+            if (IR_Cmd == IR_VOL_MINUS) {
+                Calc_Num1 = 0;
+                Calc_Input_Count = 0;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            break;
+            
+        case CALC_SELECT_OP:
+            // 选择运算符
+            if (IR_Cmd == IR_VOL_ADD) {
+                Calc_Operator = 1; // 加法
+                Calc_Current_State = CALC_INPUT_NUM2;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            } else if (IR_Cmd == IR_VOL_MINUS) {
+                Calc_Operator = 2; // 减法
+                Calc_Current_State = CALC_INPUT_NUM2;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            } else if (IR_Cmd == IR_1) {
+                Calc_Operator = 3; // 乘法（用1键代替*）
+                Calc_Current_State = CALC_INPUT_NUM2;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            } else if (IR_Cmd == IR_2) {
+                Calc_Operator = 4; // 除法（用2键代替/）
+                Calc_Current_State = CALC_INPUT_NUM2;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            
+            // 按START_STOP返回重新输入第一个数
+            if (IR_Cmd == IR_START_STOP) {
+                Calculator_Reset();
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            break;
+            
+        case CALC_INPUT_NUM2:
+            // 输入第二个数字
+            ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+            if (ir_digit != 0xFF) {
+                // 乘法限制为4位
+                if (Calc_Operator == 3 && Calc_Input_Count >= 4) {
+                    IR_Cmd = 0;
+                    break;
+                }
+                // 其他运算限制为8位
+                if (Calc_Operator != 3 && Calc_Input_Count >= 8) {
+                    IR_Cmd = 0;
+                    break;
+                }
+                
+                Calc_Num2 = Calc_Num2 * 10 + ir_digit;
+                Calc_Input_Count++;
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            
+            // 按EQ计算结果
+            if (IR_Cmd == IR_EQ) {
+                Calculator_Calculate();
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            
+            // 按START_STOP返回重新输入
+            if (IR_Cmd == IR_START_STOP) {
+                Calculator_Reset();
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            break;
+            
+        case CALC_SHOW_RESULT:
+            // 显示结果后，按任意数字键开始新的计算
+            ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+            if (ir_digit != 0xFF || IR_Cmd == IR_START_STOP) {
+                Calculator_Reset();
+                // 如果是数字键，将其作为第一个数的第一位
+                if (ir_digit != 0xFF) {
+                    Calc_Num1 = ir_digit;
+                    Calc_Input_Count = 1;
+                }
+                IR_Cmd = 0;
+                Flag_100ms_Task = 1;
+            }
+            break;
+    }
     
-    // 4. 将温度值格式化为字符串
-    //    注意：Keil C51的sprintf默认可能不支持%f浮点数格式
-    //    如果显示不正常，需要手动转换或更改编译器设置
-    // sprintf(temp_string, "Temp: %.2f C", temp_value); // 移除
-    
-    // 5. 在LCD上显示结果
-    LCD_ShowString(1, 1, "DS18B20 Test:");
-    // LCD_ShowString(2, 1, "                "); // 先清空第二行
-    // LCD_ShowString(2, 1, temp_string);
+    // 周期性刷新显示
+    if (Flag_100ms_Task) {
+        Calculator_Display();
+        Flag_100ms_Task = 0;
+    }
 }
 
 void main()
@@ -526,10 +1033,10 @@ void main()
 	Temperature = (int)DS18B20_ReadT();
 	Temperature_Point = (int)(DS18B20_ReadT() * 100) % 100;
 	Calendar_Init();
+	Password_Init();  // 初始化密码系统
 	LCD_Init();
 	IR_Init();
 	Motor_Init();
-	// // LCD1602_Test();
 	while(1)
 	{
 		IR_Data_Proc();
@@ -539,7 +1046,5 @@ void main()
 		Safe_Proc();
 		Calculator_Proc();
 
-		// DS18B20_Test();
-        // Delay(1000); // 每隔1秒测试一次
 	}
 }

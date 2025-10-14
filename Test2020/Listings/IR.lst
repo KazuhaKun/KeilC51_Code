@@ -1,10 +1,10 @@
-C51 COMPILER V9.54   IR                                                                    10/11/2025 21:32:22 PAGE 1   
+C51 COMPILER V9.54   IR                                                                    10/14/2025 21:02:24 PAGE 1   
 
 
 C51 COMPILER V9.54, COMPILATION OF MODULE IR
 OBJECT MODULE PLACED IN .\Objects\IR.obj
-COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE IR.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\IR.lst
-                    -) TABS(2) OBJECT(.\Objects\IR.obj)
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE IR.c OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\IR.lst)
+                    - TABS(2) OBJECT(.\Objects\IR.obj)
 
 line level    source
 
@@ -62,7 +62,7 @@ line level    source
   52   2          return 1;
   53   2        }
   54   1        return 0;
-C51 COMPILER V9.54   IR                                                                    10/11/2025 21:32:22 PAGE 2   
+C51 COMPILER V9.54   IR                                                                    10/14/2025 21:02:24 PAGE 2   
 
   55   1      }
   56          
@@ -126,7 +126,7 @@ line level    source
              -��下为1032）
  112   2          if(IR_Time>1032-500 && IR_Time<1032+500)
  113   2          {
-C51 COMPILER V9.54   IR                                                                    10/11/2025 21:32:22 PAGE 3   
+C51 COMPILER V9.54   IR                                                                    10/14/2025 21:02:24 PAGE 3   
 
  114   3            IR_Data[IR_pData/8]&=~(0x01<<(IR_pData%8)); //数据对应位清0
  115   3            IR_pData++;     //数据位置指针自增
@@ -160,7 +160,7 @@ line level    source
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    370    ----
+   CODE SIZE        =    353    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
