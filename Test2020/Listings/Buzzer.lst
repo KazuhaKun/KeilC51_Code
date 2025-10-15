@@ -1,0 +1,64 @@
+C51 COMPILER V9.54   BUZZER                                                                10/15/2025 22:32:03 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE BUZZER
+OBJECT MODULE PLACED IN .\Objects\Buzzer.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Buzzer.c OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\Buz
+                    -zer.lst) TABS(2) OBJECT(.\Objects\Buzzer.obj)
+
+line level    source
+
+   1          #include <REGX52.H>
+   2          #include <intrins.h>
+   3          
+   4          sbit Buzzer = P2^5;
+   5          
+   6          void Buzzer_Delay500us()    //@11.0592MHz
+   7          {
+   8   1        unsigned char i;
+   9   1      
+  10   1        _nop_();
+  11   1        i = 227;
+  12   1        while (--i);
+  13   1      }
+  14          
+  15          void Buzzer_Time(unsigned int ms)
+  16          {
+  17   1          unsigned int i;
+  18   1          for(i = 0; i < ms*2; i++)
+  19   1          {
+  20   2              Buzzer =!Buzzer;
+  21   2              Buzzer_Delay500us();
+  22   2          }
+  23   1      }
+  24          
+  25          /**
+  26            * @brief  蜂鸣器报警3秒
+  27            * @param  无
+  28            * @retval 无
+  29            * @note   用于密码错误时的报警提示
+  30            *         频率：约1kHz（500us周期翻转）
+  31            *         持续时间：3000ms
+  32            */
+  33          void Buzzer_Alarm_3s(void)
+  34          {
+  35   1          // 报警3秒，频率约1kHz
+  36   1          Buzzer_Time(3000);
+  37   1          
+  38   1          // 确保蜂鸣器停止（输出低电平）
+  39   1          Buzzer = 1;
+  40   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     50    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1110 @@
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main.
+                    -lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          // --- START OF FILE main.c ---
+   2          
+   3          #include <REGX52.H>
+   4          #include "Delay.h"
+   5          #include "Key.h"
+   6          #include "Nixie.h"
+   7          #include "Motor.h"
+   8          #include "IR.h"
+   9          #include "LCD1602.h"
+  10          #include "Buzzer.h"
+  11          #include "DS1302.h"
+  12          #include "DS18B20.h"
+  13          #include "AT24C02.h"
+  14          #include "Timer0.h"
+  15          #include "Timer1.h"
+  16          
+  17          /*PD*/
+  18          #define LINE_MAX_LENGTH 16
+  19          // 目标输入长度：年(2)月(2)日(2)时(2)分(2)秒(2) = 12位数字
+  20          #define CALENDAR_INPUT_LEN 12 
+  21          
+  22          /*PD End*/
+  23          /*PV*/
+  24          unsigned char Time_5s_Count = 0;    // 用于5秒温度任务
+  25          
+  26          bit Flag_100ms_Task = 0;  // 100毫秒任务（DS1302读取、LCD刷新（新））
+  27          bit Flag_500ms_Task = 0;  // 500毫秒任务（设置闪烁）
+  28          bit Flag_1s_Task = 0;       // 1秒任务（DS1302读取、LCD刷新）
+  29          bit Flag_5s_Task = 0;       // 5秒任务（DS18B20开始转换）
+  30          bit Flag_750ms_Ready = 0;   // DS18B20 750ms 转换完成标志
+  31          
+  32          // DS18B20 状态机
+  33          char Temp_State = 0; // 0: Idle, 1: Convert Started, 2: Read Value
+  34          
+  35          typedef enum {
+  36            Calendar,
+  37            Safe,
+  38            Calculator
+  39          } Mode;
+  40          Mode mode=Calendar;
+  41          
+  42          unsigned char IR_Cmd=0;
+  43          
+  44          xdata char Init_Time[]={19,12,31,23,59,0,2};  //初始时间
+  45          xdata char Set_Time[7];
+  46          xdata char Plause_Time[7];
+  47          xdata char L1_String[LINE_MAX_LENGTH]="";
+  48          xdata char L2_String[LINE_MAX_LENGTH]="";
+  49          
+  50          xdata int Temperature = 20; // 用于存储读取的温度值
+  51          xdata int Temperature_Point = 0; // 用于存储温度的小数部分
+  52          
+  53          #define MAX_INPUT_DIGITS 16 // 最大支持16位数字输入
+  54          
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 2   
+
+  55          // 输入结构体，用于存储输入状态
+  56          typedef struct {
+  57              unsigned char Digit_Buffer[MAX_INPUT_DIGITS]; // 存储输入的数字（0-9的数值）
+  58              unsigned char Target_Length;                  // 目标输入长度
+  59              unsigned char Current_Cursor;                 // 当前光标位置 (0 到 Target_Length - 1)
+  60              unsigned char Input_Finished;                  // 输入完成标志 (通常由确认键设置)
+  61              unsigned char Blinking_State;                  // 用于闪烁显示的标志
+  62          } IR_Input_State;
+  63          
+  64          // 全局变量，用于保存当前输入状态
+  65          xdata IR_Input_State Current_Input;
+  66          
+  67          bit Cal_Mode = 0; // 0:Display, 1:Set
+  68          
+  69          /*===== 密码相关变量 =====*/
+  70          #define PASSWORD_LENGTH 8  // 密码长度为8位
+  71          xdata unsigned char Saved_Password[PASSWORD_LENGTH];  // 保存的密码
+  72          xdata unsigned char Input_Password[PASSWORD_LENGTH];   // 输入的密码
+  73          bit Safe_Mode = 0;  // 0:验证密码, 1:设置密码
+  74          bit Password_Verified = 0;  // 密码验证成功标志
+  75          bit Password_Error = 0;     // 密码错误标志
+  76          
+  77          // EEPROM地址定义
+  78          #define EEPROM_PASSWORD_ADDR 0x10  // 密码存储起始地址(0x10-0x17)
+  79          #define EEPROM_PASSWORD_INIT_FLAG 0x18  // 密码初始化标志地址
+  80          
+  81          /*===== 计算器相关变量 =====*/
+  82          typedef enum {
+  83              CALC_INPUT_NUM1,    // 输入第一个数
+  84              CALC_SELECT_OP,     // 选择运算符
+  85              CALC_INPUT_NUM2,    // 输入第二个数
+  86              CALC_SHOW_RESULT    // 显示结果
+  87          } Calc_State;
+  88          
+  89          xdata Calc_State Calc_Current_State = CALC_INPUT_NUM1;
+  90          xdata long Calc_Num1 = 0;
+  91          xdata long Calc_Num2 = 0;
+  92          xdata unsigned char Calc_Operator = 0;
+  93          xdata float Calc_Result = 0.0;
+  94          xdata unsigned char Calc_Input_Count = 0;
+  95          
+  96          /*PV End*/
+  97          
+  98          /*Module Code*/
+  99          // ... (AT24C02_clearTime, LCD1602_Test, IR_Data_Proc, Mode_Change, IR_Cmd_To_Digit 保持原样)
+ 100          
+ 101          void AT24C02_clearTime(void){
+ 102   1        unsigned char i;
+ 103   1        for(i=0; i<7; i++){
+ 104   2          AT24C02_WriteByte(0x00 + i, 0x00);  
+ 105   2          Delay(5);
+ 106   2        }
+ 107   1      }
+ 108          
+ 109          void IR_Data_Proc(void)
+ 110          {
+ 111   1        if (IR_GetDataFlag()){IR_Cmd=IR_GetCommand();}
+ 112   1      }
+ 113          void Mode_Change(void){
+ 114   1        if (IR_Cmd == IR_MODE){
+ 115   2          mode = (Mode)((mode + 1) % 3);
+ 116   2          IR_Cmd = 0;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 3   
+
+ 117   2        }else if (IR_Cmd == IR_POWER){
+ 118   2          mode = Calendar;  //重置
+ 119   2          IR_Cmd = 0;
+ 120   2        }
+ 121   1      }
+ 122          
+ 123          // 将红外命令转换为对应的数字 (0-9)，如果不是数字则返回 0xFF
+ 124          unsigned char IR_Cmd_To_Digit(unsigned char cmd) {
+ 125   1          switch (cmd) {
+ 126   2              case IR_0: return 0;
+ 127   2              case IR_1: return 1;
+ 128   2              case IR_2: return 2;
+ 129   2              case IR_3: return 3;
+ 130   2              case IR_4: return 4;
+ 131   2              case IR_5: return 5;
+ 132   2              case IR_6: return 6;
+ 133   2              case IR_7: return 7;
+ 134   2              case IR_8: return 8;
+ 135   2              case IR_9: return 9;
+ 136   2              default: return 0xFF; // 返回无效值
+ 137   2          }
+ 138   1      }
+ 139          
+ 140          /*===== 密码功能函数 =====*/
+ 141          
+ 142          /**
+ 143           * @brief 初始化密码系统
+ 144           * 从EEPROM读取密码，如果未初始化则设置默认密码12345678
+ 145           */
+ 146          void Password_Init(void) {
+ 147   1          unsigned char i;
+ 148   1          unsigned char init_flag;
+ 149   1          
+ 150   1          // 读取初始化标志
+ 151   1          init_flag = AT24C02_ReadByte(EEPROM_PASSWORD_INIT_FLAG);
+ 152   1          
+ 153   1          if (init_flag != 0xAA) {
+ 154   2              // 首次使用，设置默认密码 12345678
+ 155   2              for (i = 0; i < PASSWORD_LENGTH; i++) {
+ 156   3                  Saved_Password[i] = (i + 1) % 10; // 12345678
+ 157   3                  AT24C02_WriteByte(EEPROM_PASSWORD_ADDR + i, Saved_Password[i]);
+ 158   3                  Delay(5);
+ 159   3              }
+ 160   2              // 设置初始化标志
+ 161   2              AT24C02_WriteByte(EEPROM_PASSWORD_INIT_FLAG, 0xAA);
+ 162   2              Delay(5);
+ 163   2          } else {
+ 164   2              // 从EEPROM读取密码
+ 165   2              for (i = 0; i < PASSWORD_LENGTH; i++) {
+ 166   3                  Saved_Password[i] = AT24C02_ReadByte(EEPROM_PASSWORD_ADDR + i);
+ 167   3              }
+ 168   2          }
+ 169   1      }
+ 170          
+ 171          /**
+ 172           * @brief 保存密码到EEPROM
+ 173           */
+ 174          void Password_Save(void) {
+ 175   1          unsigned char i;
+ 176   1          for (i = 0; i < PASSWORD_LENGTH; i++) {
+ 177   2              AT24C02_WriteByte(EEPROM_PASSWORD_ADDR + i, Saved_Password[i]);
+ 178   2              Delay(5);
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 4   
+
+ 179   2          }
+ 180   1      }
+ 181          
+ 182          /**
+ 183           * @brief 验证密码是否正确
+ 184           * @return 1:正确, 0:错误
+ 185           */
+ 186          bit Password_Verify(void) {
+ 187   1          unsigned char i;
+ 188   1          for (i = 0; i < PASSWORD_LENGTH; i++) {
+ 189   2              if (Input_Password[i] != Saved_Password[i]) {
+ 190   3                  return 0; // 密码错误
+ 191   3              }
+ 192   2          }
+ 193   1          return 1; // 密码正确
+ 194   1      }
+ 195          
+ 196          /**
+ 197           * @brief 显示密码输入界面
+ 198           * @param is_setting 1:设置密码, 0:验证密码
+ 199           */
+ 200          void Password_Display(bit is_setting) {
+ 201   1          unsigned char i;
+ 202   1          
+ 203   1          // 第一行显示提示
+ 204   1          if (is_setting) {
+ 205   2              LCD_ShowString(1, 1, "Set Password:   ");
+ 206   2          } else {
+ 207   2              LCD_ShowString(1, 1, "Enter Password: ");
+ 208   2          }
+ 209   1          
+ 210   1          // 第二行显示已输入的密码（用*或数字显示）
+ 211   1          for (i = 0; i < PASSWORD_LENGTH; i++) {
+ 212   2              if (i < Current_Input.Current_Cursor) {
+ 213   3                  // 已输入的位置显示星号
+ 214   3                  LCD_ShowChar(2, i + 1, '*');
+ 215   3              } else if (i == Current_Input.Current_Cursor && Flag_500ms_Task) {
+ 216   3                  // 当前光标位置闪烁
+ 217   3                  LCD_ShowChar(2, i + 1, '_');
+ 218   3              } else {
+ 219   3                  // 未输入的位置显示下划线
+ 220   3                  LCD_ShowChar(2, i + 1, '-');
+ 221   3              }
+ 222   2          }
+ 223   1          // 清除多余字符
+ 224   1          for (i = PASSWORD_LENGTH + 1; i <= 16; i++) {
+ 225   2              LCD_ShowChar(2, i, ' ');
+ 226   2          }
+ 227   1      }
+ 228          
+ 229          /**
+ 230           * @brief 步进电机正转5圈后反转5圈（预留接口）
+ 231           */
+ 232          void Motor_OpenDoor(void) {
+ 233   1          // TODO: 实现步进电机控制
+ 234   1          // 正转5圈
+ 235   1          // Delay(...)
+ 236   1          // 反转5圈
+ 237   1          
+ 238   1          LCD_ShowString(1, 1, "Door Opened!    ");
+ 239   1          LCD_ShowString(2, 1, "Motor Running..."); 
+ 240   1          Delay(3000); // 模拟电机运行时间
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 5   
+
+ 241   1      }
+ 242          
+ 243          /**
+ 244           * @brief 蜂鸣器报警3秒（预留接口）
+ 245           */
+ 246          void Buzzer_Alarm(void) {
+ 247   1          // TODO: 实现蜂鸣器控制
+ 248   1          // 报警3秒
+ 249   1          
+ 250   1          LCD_ShowString(1, 1, "Wrong Password! ");
+ 251   1          LCD_ShowString(2, 1, "Buzzer Alarm... ");
+ 252   1          Delay(3000); // 模拟蜂鸣器报警3秒
+ 253   1      }
+ 254          
+ 255          /*===== 计算器功能函数 =====*/
+ 256          
+ 257          void Calculator_Reset(void) {
+ 258   1          Calc_Num1 = 0;
+ 259   1          Calc_Num2 = 0;
+ 260   1          Calc_Operator = 0;
+ 261   1          Calc_Result = 0.0;
+ 262   1          Calc_Input_Count = 0;
+ 263   1          Calc_Current_State = CALC_INPUT_NUM1;
+ 264   1      }
+ 265          
+ 266          /**
+ 267           * @brief 显示数字到LCD（支持最多8位）
+ 268           * @param num 要显示的数字
+ 269           * @param line LCD行号(1或2)
+ 270           * @param start_col 起始列号
+ 271           */
+ 272          void Calculator_ShowNumber(long num, unsigned char line, unsigned char start_col) {
+ 273   1          unsigned char i;
+ 274   1          unsigned char digits[8];
+ 275   1          unsigned char digit_count = 0;
+ 276   1          long temp = num;
+ 277   1          bit is_negative = 0;
+ 278   1          
+ 279   1          // 处理负数
+ 280   1          if (num < 0) {
+ 281   2              is_negative = 1;
+ 282   2              temp = -num;
+ 283   2          }
+ 284   1          
+ 285   1          // 提取每一位数字
+ 286   1          if (temp == 0) {
+ 287   2              digits[0] = 0;
+ 288   2              digit_count = 1;
+ 289   2          } else {
+ 290   2              while (temp > 0 && digit_count < 8) {
+ 291   3                  digits[digit_count++] = temp % 10;
+ 292   3                  temp /= 10;
+ 293   3              }
+ 294   2          }
+ 295   1          
+ 296   1          // 显示负号
+ 297   1          if (is_negative) {
+ 298   2              LCD_ShowChar(line, start_col++, '-');
+ 299   2          }
+ 300   1          
+ 301   1          // 反向显示数字
+ 302   1          for (i = digit_count; i > 0; i--) {
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 6   
+
+ 303   2              LCD_ShowChar(line, start_col++, '0' + digits[i-1]);
+ 304   2          }
+ 305   1      }
+ 306          
+ 307          void Calculator_ShowResult(float result) {
+ 308   1          long integer_part;
+ 309   1          unsigned int decimal_part;
+ 310   1          unsigned char pos;
+ 311   1          unsigned char i;
+ 312   1          
+ 313   1          LCD_ShowString(1, 1, "Res:            ");
+ 314   1          
+ 315   1          pos = 1;
+ 316   1          
+ 317   1          // 处理负数
+ 318   1          if (result < 0) {
+ 319   2              LCD_ShowChar(2, pos++, '-');
+ 320   2              result = -result;
+ 321   2          }
+ 322   1          
+ 323   1          integer_part = (long)result;
+ 324   1          decimal_part = (unsigned int)((result - integer_part) * 10000);
+ 325   1          
+ 326   1          // 显示整数部分
+ 327   1          Calculator_ShowNumber(integer_part, 2, pos);
+ 328   1          
+ 329   1          // 计算整数部分占用的位置
+ 330   1          if (integer_part == 0) {
+ 331   2              pos += 1;
+ 332   2          } else {
+ 333   2              long temp = integer_part;
+ 334   2              while (temp > 0) {
+ 335   3                  temp /= 10;
+ 336   3                  pos++;
+ 337   3              }
+ 338   2          }
+ 339   1          
+ 340   1          // 只在除法时显示小数部分
+ 341   1          if (Calc_Operator == 4 && pos < 11) {
+ 342   2              LCD_ShowChar(2, pos++, '.');
+ 343   2              LCD_ShowChar(2, pos++, '0' + (decimal_part / 1000) % 10);
+ 344   2              LCD_ShowChar(2, pos++, '0' + (decimal_part / 100) % 10);
+ 345   2              LCD_ShowChar(2, pos++, '0' + (decimal_part / 10) % 10);
+ 346   2              LCD_ShowChar(2, pos++, '0' + decimal_part % 10);
+ 347   2          }
+ 348   1          
+ 349   1          // 清除第二行剩余部分
+ 350   1          for (i = pos; i <= 16; i++) {
+ 351   2              LCD_ShowChar(2, i, ' ');
+ 352   2          }
+ 353   1      }
+ 354          
+ 355          void Calculator_Calculate(void) {
+ 356   1          switch (Calc_Operator) {
+ 357   2              case 1:
+ 358   2                  Calc_Result = (float)Calc_Num1 + (float)Calc_Num2;
+ 359   2                  break;
+ 360   2              case 2:
+ 361   2                  Calc_Result = (float)Calc_Num1 - (float)Calc_Num2;
+ 362   2                  break;
+ 363   2              case 3:
+ 364   2                  Calc_Result = (float)Calc_Num1 * (float)Calc_Num2;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 7   
+
+ 365   2                  break;
+ 366   2              case 4:
+ 367   2                  if (Calc_Num2 != 0) {
+ 368   3                      Calc_Result = (float)Calc_Num1 / (float)Calc_Num2;
+ 369   3                  } else {
+ 370   3                      LCD_ShowString(1, 1, "Err:Div by 0    ");
+ 371   3                      LCD_ShowString(2, 1, "                ");
+ 372   3                      Delay(1500);
+ 373   3                      Calculator_Reset();
+ 374   3                      return;
+ 375   3                  }
+ 376   2                  break;
+ 377   2              default:
+ 378   2                  return;
+ 379   2          }
+ 380   1          
+ 381   1          Calculator_ShowResult(Calc_Result);
+ 382   1          Calc_Current_State = CALC_SHOW_RESULT;
+ 383   1      }
+ 384          
+ 385          /**
+ 386           * @brief 显示当前输入状态
+ 387           */
+ 388          void Calculator_Display(void) {
+ 389   1          unsigned char i;
+ 390   1          
+ 391   1          switch (Calc_Current_State) {
+ 392   2              case CALC_INPUT_NUM1:
+ 393   2                  LCD_ShowString(1, 1, "Num1:           ");
+ 394   2                  if (Calc_Input_Count > 0) {
+ 395   3                      Calculator_ShowNumber(Calc_Num1, 1, 6);
+ 396   3                  }
+ 397   2                  LCD_ShowString(2, 1, "                ");
+ 398   2                  break;
+ 399   2                  
+ 400   2              case CALC_SELECT_OP:
+ 401   2                  LCD_ShowString(1, 1, "Select Op:      ");
+ 402   2                  LCD_ShowString(2, 1, "+  -  *  /      ");
+ 403   2                  break;
+ 404   2                  
+ 405   2              case CALC_INPUT_NUM2:
+ 406   2                  LCD_ShowString(1, 1, "Num2:           ");
+ 407   2                  if (Calc_Input_Count > 0) {
+ 408   3                      Calculator_ShowNumber(Calc_Num2, 1, 6);
+ 409   3                  }
+ 410   2                  // 显示运算符在第二行
+ 411   2                  LCD_ShowChar(2, 1, Calc_Operator == 1 ? '+' : 
+ 412   2                                     Calc_Operator == 2 ? '-' : 
+ 413   2                                     Calc_Operator == 3 ? '*' : '/');
+ 414   2                  // 清除第二行其余部分
+ 415   2                  for (i = 2; i <= 16; i++) {
+ 416   3                      LCD_ShowChar(2, i, ' ');
+ 417   3                  }
+ 418   2                  break;
+ 419   2                  
+ 420   2              case CALC_SHOW_RESULT:
+ 421   2                  // 结果已在 Calculate 函数中显示
+ 422   2                  return;
+ 423   2          }
+ 424   1      }
+ 425          
+ 426          void Calendar_Init(void){
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 8   
+
+ 427   1          unsigned char i;
+ 428   1        DS1302_Init();
+ 429   1        // EEPROM 读时间
+ 430   1          for(i=0; i<7; i++){
+ 431   2              DS1302_Time[i] = AT24C02_ReadByte(0x00 + i);
+ 432   2          }
+ 433   1          
+ 434   1          // 检查数据有效性
+ 435   1          if (DS1302_Time[0] == 0x00) { 
+ 436   2              const char code Init_Time[] = {19,12,31,23,59,0,2}; 
+ 437   2              for(i=0; i<sizeof(Init_Time); i++){
+ 438   3                  DS1302_Time[i] = Init_Time[i];
+ 439   3              }
+ 440   2          }
+ 441   1          // 设置时间到 DS1302
+ 442   1        DS1302_SetTime();
+ 443   1          
+ 444   1        // 备份时间到 EEPROM
+ 445   1          for(i=0; i<7; i++){
+ 446   2              AT24C02_WriteByte(0x00 + i, DS1302_Time[i]); 
+ 447   2              Delay(5);
+ 448   2          }
+ 449   1      }
+ 450          
+ 451          // **修改：使用手动ASCII转换，移除 sprintf**
+ 452          void Calendar_Disp(void){
+ 453   1          unsigned char i;
+ 454   1        DS1302_ReadTime(); // 从DS1302读取时间
+ 455   1          
+ 456   1          // ====== L1: 20YY-MM-DD (16 chars) ======
+ 457   1          L1_String[0] = '2'; L1_String[1] = '0';
+ 458   1          L1_String[4] = '-'; L1_String[7] = '-';
+ 459   1          
+ 460   1          // YY (i=0, L1_String index 2,3)
+ 461   1          L1_String[2] = DS1302_Time[0]/10 + '0';
+ 462   1          L1_String[3] = DS1302_Time[0]%10 + '0';
+ 463   1          
+ 464   1          // MM (i=1, L1_String index 5,6)
+ 465   1          L1_String[5] = DS1302_Time[1]/10 + '0';
+ 466   1          L1_String[6] = DS1302_Time[1]%10 + '0';
+ 467   1          
+ 468   1          // DD (i=2, L1_String index 8,9)
+ 469   1          L1_String[8] = DS1302_Time[2]/10 + '0';
+ 470   1          L1_String[9] = DS1302_Time[2]%10 + '0';
+ 471   1          
+ 472   1          // 填充剩余空格
+ 473   1          for (i = 10; i < LINE_MAX_LENGTH; i++) { L1_String[i] = ' '; }
+ 474   1          L1_String[LINE_MAX_LENGTH-1] = '\0';
+ 475   1          
+ 476   1        LCD_ShowString(1,1,L1_String);
+ 477   1      
+ 478   1          // ====== L2: HH:mm:ss  Temp.Temp_Point C (16 chars) ======
+ 479   1          L2_String[2] = ':'; L2_String[5] = ':';
+ 480   1          
+ 481   1          // HH (i=3, L2_String index 0,1)
+ 482   1          L2_String[0] = DS1302_Time[3]/10 + '0';
+ 483   1          L2_String[1] = DS1302_Time[3]%10 + '0';
+ 484   1          
+ 485   1          // mm (i=4, L2_String index 3,4)
+ 486   1          L2_String[3] = DS1302_Time[4]/10 + '0';
+ 487   1          L2_String[4] = DS1302_Time[4]%10 + '0';
+ 488   1          
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 9   
+
+ 489   1          // ss (i=5, L2_String index 6,7)
+ 490   1          L2_String[6] = DS1302_Time[5]/10 + '0';
+ 491   1          L2_String[7] = DS1302_Time[5]%10 + '0';
+ 492   1      
+ 493   1          L2_String[8] = ' ';
+ 494   1          L2_String[9] = ' ';
+ 495   1          
+ 496   1          // Temp (L2_String index 10,11)
+ 497   1          // 假设 Temperature <= 99
+ 498   1          L2_String[10] = Temperature/10 + '0';
+ 499   1          L2_String[11] = Temperature%10 + '0';
+ 500   1          
+ 501   1          L2_String[12] = '.';
+ 502   1          
+ 503   1          // Temp_Point (L2_String index 13,14)
+ 504   1          L2_String[13] = Temperature_Point/10 + '0';
+ 505   1          L2_String[14] = Temperature_Point%10 + '0';
+ 506   1          
+ 507   1          L2_String[15] = 'C';
+ 508   1          L2_String[LINE_MAX_LENGTH] = '\0'; // 确保字符串正确终止
+ 509   1          
+ 510   1        LCD_ShowString(2,1,L2_String);
+ 511   1      }
+ 512          
+ 513          void Time_Backup(void){
+ 514   1      // ... (保持原样)
+ 515   1        //每秒备份秒
+ 516   1        AT24C02_WriteByte(0x05, DS1302_Time[5]);
+ 517   1        // Delay(5);
+ 518   1        //每分钟备份分
+ 519   1        if (DS1302_Time[5] == 0) {
+ 520   2          AT24C02_WriteByte(0x04, DS1302_Time[4]);
+ 521   2          // Delay(5);
+ 522   2        }
+ 523   1        //每小时备份时
+ 524   1        if (DS1302_Time[4] == 0 && DS1302_Time[5] == 0) {
+ 525   2          AT24C02_WriteByte(0x03, DS1302_Time[3]);
+ 526   2          // Delay(5);
+ 527   2        }
+ 528   1      }
+ 529          
+ 530          /**
+ 531           * @brief 初始化红外输入模块 初始化长度、初始值、光标位置、输入状态等
+ 532           * @param Target_Length 目标输入的数字位数 (例如：日历时间设置总共14位)
+ 533           * @param Initial_Values 可选的初始值数组 (如果需要预填充)，可传入 NULL
+ 534           */
+ 535          void IR_Input_Init(unsigned char Target_Length, unsigned char *Initial_Values)
+ 536          {
+ 537   1          unsigned char i;
+ 538   1          
+ 539   1          // 限制最大长度
+ 540   1          if (Target_Length > MAX_INPUT_DIGITS) {
+ 541   2              Target_Length = MAX_INPUT_DIGITS;
+ 542   2          }
+ 543   1      
+ 544   1          Current_Input.Target_Length = Target_Length; // 目标长度：12
+ 545   1          Current_Input.Current_Cursor = 0; // 光标从第一位开始
+ 546   1          Current_Input.Input_Finished = 0; // 输入未完成
+ 547   1      
+ 548   1          // 循环6次，对应6个时间分量 (年,月,日,时,分,秒)
+ 549   1          for (i = 0; i < 6; i++) 
+ 550   1          {
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 10  
+
+ 551   2              // Target_Length 是 12。我们检查 i*2 是否在范围内
+ 552   2              if (i*2 < Target_Length && Initial_Values != 0) {
+ 553   3                  // 将两位数（例如 19）拆分成两个数字（1 和 9）
+ 554   3                  Current_Input.Digit_Buffer[i*2] = Initial_Values[i]/10;
+ 555   3            Current_Input.Digit_Buffer[i*2+1] = Initial_Values[i]%10;
+ 556   3              } else {
+ 557   3                  // 否则初始化为 0
+ 558   3                  Current_Input.Digit_Buffer[i*2] = 0; 
+ 559   3            Current_Input.Digit_Buffer[i*2+1] = 0;
+ 560   3              }
+ 561   2          }
+ 562   1      }
+ 563          
+ 564          void IR_Input_Proc(unsigned char ir_digit){
+ 565   1        if(Current_Input.Target_Length == 0 || Current_Input.Input_Finished){
+ 566   2          return; // 如果没有设置目标长度或输入已完成，直接返回
+ 567   2        }
+ 568   1        
+ 569   1          // 1. 存储新的数字
+ 570   1        Current_Input.Digit_Buffer[Current_Input.Current_Cursor] = ir_digit;
+ 571   1      
+ 572   1          // 2. 移动光标
+ 573   1        Current_Input.Current_Cursor++;
+ 574   1      
+ 575   1          // 3. 检查是否完成输入
+ 576   1          if (Current_Input.Current_Cursor >= Current_Input.Target_Length) {
+ 577   2              Current_Input.Input_Finished = 1; // 12位输入完成
+ 578   2              Current_Input.Current_Cursor = 0; // 光标归零
+ 579   2          }
+ 580   1      }
+ 581          
+ 582          // **新增/修改：使用手动索引和赋值，移除 strlen**
+ 583          void Calendar_Build_String_Set(bit Blink_State)
+ 584          {
+ 585   1          unsigned char i;
+ 586   1          unsigned char digit;
+ 587   1          unsigned char L1_Cursor = 0;
+ 588   1          unsigned char L2_Cursor = 0;
+ 589   1          
+ 590   1          // ====== L1: 20YY-MM-DD (16 chars) ======
+ 591   1          // 20
+ 592   1          L1_String[L1_Cursor++] = '2'; 
+ 593   1          L1_String[L1_Cursor++] = '0';
+ 594   1          
+ 595   1          for (i = 0; i < 6; i++) // Digits 0 to 5 (YY MM DD)
+ 596   1          {
+ 597   2              digit = Current_Input.Digit_Buffer[i];
+ 598   2              
+ 599   2              // 闪烁逻辑: 如果当前光标位置 i 且 Blink_State 为真，则显示空格
+ 600   2              if (i == Current_Input.Current_Cursor && Blink_State) {
+ 601   3                  L1_String[L1_Cursor++] = ' ';
+ 602   3              } else {
+ 603   3                  L1_String[L1_Cursor++] = '0' + digit;
+ 604   3              }
+ 605   2              
+ 606   2              // 添加分隔符 (在 YY2 (i=1) 和 MM2 (i=3) 之后)
+ 607   2              if (i == 1 || i == 3) {
+ 608   3                  L1_String[L1_Cursor++] = '-';
+ 609   3              }
+ 610   2          }
+ 611   1          // 填充L1长度
+ 612   1          while (L1_Cursor < LINE_MAX_LENGTH) { L1_String[L1_Cursor++] = ' '; }
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 11  
+
+ 613   1          L1_String[LINE_MAX_LENGTH-1] = '\0'; // 字符串结束符
+ 614   1      
+ 615   1          // ====== L2: HH:mm:ss (16 chars) ======
+ 616   1          for (i = 6; i < 12; i++) // Digits 6 to 11 (HH mm ss)
+ 617   1          {
+ 618   2              digit = Current_Input.Digit_Buffer[i];
+ 619   2      
+ 620   2              // 闪烁逻辑
+ 621   2              if (i == Current_Input.Current_Cursor && Blink_State) {
+ 622   3                  L2_String[L2_Cursor++] = ' ';
+ 623   3              } else {
+ 624   3                  L2_String[L2_Cursor++] = '0' + digit;
+ 625   3              }
+ 626   2      
+ 627   2              // 添加分隔符 (在 HH2 (i=7) 和 mm2 (i=9) 之后)
+ 628   2              if (i == 7 || i == 9) {
+ 629   3                  L2_String[L2_Cursor++] = ':';
+ 630   3              }
+ 631   2          }
+ 632   1          // 填充L2长度
+ 633   1          while (L2_Cursor < LINE_MAX_LENGTH) { L2_String[L2_Cursor++] = ' '; }
+ 634   1          L2_String[LINE_MAX_LENGTH] = '\0'; // 字符串结束符
+ 635   1      }
+ 636          
+ 637          
+ 638          void Calendar_Set(void){
+ 639   1        static bit Cal_Set_Init_Flag = 0; // 0:未初始化, 1:已初始化
+ 640   1        unsigned char i;
+ 641   1        unsigned char ir_digit;
+ 642   1      
+ 643   1        
+ 644   1        if (!Cal_Set_Init_Flag) {
+ 645   2          DS1302_ReadTime(); // 从DS1302读取时间
+ 646   2          for (i = 0; i < 7; i++){
+ 647   3            Plause_Time[i] = DS1302_Time[i];
+ 648   3          }
+ 649   2          IR_Input_Init(CALENDAR_INPUT_LEN, Plause_Time); // 初始化红外输入模块，目标长度为12，初
+             -始值为当前时间
+ 650   2          Cal_Set_Init_Flag = 1;
+ 651   2              
+ 652   2              Flag_100ms_Task = 1; // 立即刷新显示
+ 653   2        }
+ 654   1          
+ 655   1          // 1. 处理红外输入
+ 656   1        ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+ 657   1        if (ir_digit != 0xFF) { // 仅当红外输入是有效数字时才处理
+ 658   2          IR_Input_Proc(ir_digit); // 处理红外输入：存入Digit_Buffer，移动光标
+ 659   2          IR_Cmd = 0xFF; // 清除命令，防止重复处理
+ 660   2              Flag_100ms_Task = 1; // 立即刷新显示
+ 661   2        }
+ 662   1          // // 处理确认键 (例如 IR_OK) - 强制完成输入并保存
+ 663   1          // if (IR_Cmd == IR_EQ) {
+ 664   1          //     Current_Input.Input_Finished = 1;
+ 665   1          //     IR_Cmd = 0;
+ 666   1          // }
+ 667   1        
+ 668   1          // 2. 周期性刷新显示 (100ms 任务)
+ 669   1          if (Flag_100ms_Task) {
+ 670   2              
+ 671   2              // 3. 处理显示：格式化字符串并在光标位置应用闪烁
+ 672   2              Calendar_Build_String_Set(Flag_500ms_Task); // **修改：使用新的无 strlen 函数**
+ 673   2      
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 12  
+
+ 674   2              // 显示字符串
+ 675   2              LCD_ShowString(1,1,L1_String);
+ 676   2              LCD_ShowString(2,1,L2_String);
+ 677   2              
+ 678   2              Flag_100ms_Task = 0;
+ 679   2          }
+ 680   1      
+ 681   1      
+ 682   1        // 4. 输入完成后的数据转换和保存
+ 683   1        if (Current_Input.Input_Finished)
+ 684   1        {
+ 685   2          // 输入完成，将 12 位数字重新组合成 6 个时间分量
+ 686   2          for (i = 0; i < 6; i++)
+ 687   2          {
+ 688   3                  // Set_Time[0]=D[0]*10+D[1], Set_Time[1]=D[2]*10+D[3], ...
+ 689   3            Set_Time[i] = Current_Input.Digit_Buffer[i * 2] * 10 + Current_Input.Digit_Buffer[i * 2 + 1];
+ 690   3          }
+ 691   2              // 星期保持不变
+ 692   2              Set_Time[6] = Plause_Time[6]; 
+ 693   2      
+ 694   2          // 更新 DS1302_Time 数组
+ 695   2          for(i=0; i<7; i++){
+ 696   3            DS1302_Time[i] = Set_Time[i];
+ 697   3          }
+ 698   2              
+ 699   2          // 设置时间到DS1302芯片
+ 700   2          DS1302_SetTime();
+ 701   2              Delay(10); // 等待DS1302写入完成
+ 702   2              
+ 703   2              // 读取验证：从DS1302读回时间，确保写入成功
+ 704   2              DS1302_ReadTime();
+ 705   2              
+ 706   2              // 备份时间到 EEPROM
+ 707   2              for(i=0; i<7; i++){
+ 708   3                  AT24C02_WriteByte(0x00 + i, DS1302_Time[i]); 
+ 709   3                  Delay(5);
+ 710   3              }
+ 711   2      
+ 712   2          Cal_Set_Init_Flag = 0; // 重置初始化标志，下次进入重新加载时间
+ 713   2              Current_Input.Input_Finished = 0; // 重置输入完成标志
+ 714   2              Cal_Mode = 0; // 切换回显示模式
+ 715   2        }
+ 716   1        
+ 717   1      }
+ 718          
+ 719          /*Module Code End*/
+ 720          
+ 721          /*Proc Code*/
+ 722          void Temp_Proc(void){
+ 723   1          if (mode != Calendar) return;
+ 724   1      
+ 725   1          if (Temp_State == 0) { // Idle 状态
+ 726   2              if (Flag_5s_Task) {
+ 727   3                  // 开始温度转换，不阻塞
+ 728   3                  P3_5 = 1;
+ 729   3                  DS18B20_ConvertT(); // 假设这个函数只是发送启动命令
+ 730   3                  Flag_5s_Task = 0;
+ 731   3                  Temp_State = 1; // 进入转换中状态
+ 732   3              }
+ 733   2          } else if (Temp_State == 1) { // 转换中状态
+ 734   2              if (Flag_750ms_Ready) {
+ 735   3            float temp;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 13  
+
+ 736   3                  // 750ms 等待完成，读取温度
+ 737   3                  P3_5 = 1;
+ 738   3            temp = DS18B20_ReadT();
+ 739   3            Temperature_Point = (int)(temp * 100) % 100;
+ 740   3            Temperature = (int)temp;
+ 741   3      
+ 742   3                  Flag_750ms_Ready = 0;
+ 743   3                  Temp_State = 0; // 回到 Idle 状态
+ 744   3              }
+ 745   2          }
+ 746   1      }
+ 747          
+ 748          void Calendar_Proc(void){
+ 749   1        if (mode != Calendar) {return;}
+ 750   1          
+ 751   1          if (IR_Cmd == IR_START_STOP) {
+ 752   2              Cal_Mode = !Cal_Mode; // 切换模式
+ 753   2              IR_Cmd = 0; // 清除命令，防止重复处理
+ 754   2          }
+ 755   1              
+ 756   1        // 2. 周期性任务处理
+ 757   1          if (Cal_Mode) {
+ 758   2              // 设置模式
+ 759   2              // --- A. 按键处理 (只处理保存键) ---
+ 760   2              if (IR_Cmd == IR_EQ) {
+ 761   3                  Current_Input.Input_Finished = 1;
+ 762   3                  IR_Cmd = 0; // 清除命令，防止重复处理
+ 763   3              }
+ 764   2              
+ 765   2              // --- B. 设置逻辑 (包括输入和保存) ---
+ 766   2          Calendar_Set();
+ 767   2      
+ 768   2              // 500ms 任务：用于闪烁切换
+ 769   2              if (Flag_500ms_Task) {
+ 770   3                  Flag_500ms_Task = 0;
+ 771   3              }
+ 772   2              
+ 773   2        } else {
+ 774   2              // 显示模式
+ 775   2              // --- E. 显示逻辑 ---
+ 776   2              if (Flag_100ms_Task) {
+ 777   3                  Calendar_Disp();
+ 778   3            Flag_100ms_Task = 0; 
+ 779   3              }
+ 780   2              // ... (Time_Backup 和 Temp_Proc 保持不变)
+ 781   2          if (Flag_1s_Task) {
+ 782   3            Time_Backup(); // 每秒备份时间到 EEPROM
+ 783   3            Flag_1s_Task = 0;
+ 784   3          }
+ 785   2              
+ 786   2              // 5秒任务：温度转换和读取 (通过 Temp_Proc 状态机处理)
+ 787   2              Temp_Proc();        
+ 788   2        }
+ 789   1      }
+ 790          // ... (Safe_Proc, Calculator_Proc, DS18B20_Test 保持原样)
+ 791          void Safe_Proc(void){
+ 792   1          static bit Safe_Init_Flag = 0;
+ 793   1          unsigned char ir_digit;
+ 794   1          
+ 795   1        if (mode != Safe) {
+ 796   2              Safe_Init_Flag = 0;
+ 797   2              return;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 14  
+
+ 798   2          } 
+ 799   1          
+ 800   1          // 初始化
+ 801   1          if (!Safe_Init_Flag) {
+ 802   2              // 初始化输入模块
+ 803   2              IR_Input_Init(PASSWORD_LENGTH, 0); // 8位密码，不预填充
+ 804   2              Safe_Mode = 0; // 默认为验证密码模式
+ 805   2              Password_Verified = 0;
+ 806   2              Password_Error = 0;
+ 807   2              Safe_Init_Flag = 1;
+ 808   2              Flag_100ms_Task = 1; // 立即刷新显示
+ 809   2          }
+ 810   1          
+ 811   1          // 按键处理
+ 812   1          if (IR_Cmd == IR_START_STOP) {
+ 813   2              // 切换设置/验证模式
+ 814   2              Safe_Mode = !Safe_Mode;
+ 815   2              IR_Input_Init(PASSWORD_LENGTH, 0); // 重新初始化输入
+ 816   2              Password_Verified = 0;
+ 817   2              Password_Error = 0;
+ 818   2              IR_Cmd = 0;
+ 819   2              Flag_100ms_Task = 1;
+ 820   2          }
+ 821   1          
+ 822   1          // 处理数字输入
+ 823   1          ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+ 824   1          if (ir_digit != 0xFF) {
+ 825   2              // 存储输入的数字
+ 826   2              if (Safe_Mode) {
+ 827   3                  // 设置密码模式
+ 828   3                  Saved_Password[Current_Input.Current_Cursor] = ir_digit;
+ 829   3              } else {
+ 830   3                  // 验证密码模式
+ 831   3                  Input_Password[Current_Input.Current_Cursor] = ir_digit;
+ 832   3              }
+ 833   2              
+ 834   2              IR_Input_Proc(ir_digit); // 移动光标
+ 835   2              IR_Cmd = 0;
+ 836   2              Flag_100ms_Task = 1;
+ 837   2          }
+ 838   1          
+ 839   1          // 处理确认键
+ 840   1          if (IR_Cmd == IR_EQ) {
+ 841   2              Current_Input.Input_Finished = 1;
+ 842   2              IR_Cmd = 0;
+ 843   2          }
+ 844   1          
+ 845   1          // 周期性刷新显示
+ 846   1          if (Flag_100ms_Task) {
+ 847   2              Password_Display(Safe_Mode);
+ 848   2              Flag_100ms_Task = 0;
+ 849   2          }
+ 850   1          
+ 851   1          // 输入完成处理
+ 852   1          if (Current_Input.Input_Finished) {
+ 853   2              if (Safe_Mode) {
+ 854   3                  // 设置密码模式：保存密码
+ 855   3                  Password_Save();
+ 856   3                  LCD_ShowString(1, 1, "Password Saved! ");
+ 857   3                  LCD_ShowString(2, 1, "                ");
+ 858   3                  Delay(1500);
+ 859   3                  Safe_Mode = 0; // 切换回验证模式
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 15  
+
+ 860   3              } else {
+ 861   3                  // 验证密码模式
+ 862   3                  if (Password_Verify()) {
+ 863   4                      // 密码正确
+ 864   4                      Password_Verified = 1;
+ 865   4                      LCD_ShowString(1, 1, "Password OK!    ");
+ 866   4                      LCD_ShowString(2, 1, "Opening Door... ");
+ 867   4                      Delay(1000);
+ 868   4                      
+ 869   4                      // 调用步进电机开门函数
+ 870   4                      Motor_OpenDoor();
+ 871   4                      
+ 872   4                      Password_Verified = 0;
+ 873   4                  } else {
+ 874   4                      // 密码错误
+ 875   4                      Password_Error = 1;
+ 876   4                      
+ 877   4                      // 调用蜂鸣器报警函数
+ 878   4                      Buzzer_Alarm();
+ 879   4                      
+ 880   4                      Password_Error = 0;
+ 881   4                  }
+ 882   3              }
+ 883   2              
+ 884   2              // 重新初始化输入
+ 885   2              IR_Input_Init(PASSWORD_LENGTH, 0);
+ 886   2              Current_Input.Input_Finished = 0;
+ 887   2              Flag_100ms_Task = 1;
+ 888   2          }
+ 889   1      }
+ 890          
+ 891          void Calculator_Proc(void){
+ 892   1          static bit Calc_Init_Flag = 0;
+ 893   1          unsigned char ir_digit;
+ 894   1          
+ 895   1        if (mode != Calculator) {
+ 896   2              Calc_Init_Flag = 0;
+ 897   2              return;
+ 898   2          }
+ 899   1          
+ 900   1          // 初始化
+ 901   1          if (!Calc_Init_Flag) {
+ 902   2              Calculator_Reset();
+ 903   2              Calc_Init_Flag = 1;
+ 904   2              Flag_100ms_Task = 1;
+ 905   2          }
+ 906   1          
+ 907   1          // 处理按键
+ 908   1          switch (Calc_Current_State) {
+ 909   2              case CALC_INPUT_NUM1:
+ 910   2                  // 输入第一个数字（最多8位或乘法时4位）
+ 911   2                  ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+ 912   2                  if (ir_digit != 0xFF) {
+ 913   3                      Calc_Num1 = Calc_Num1 * 10 + ir_digit;
+ 914   3                      Calc_Input_Count++;
+ 915   3                      IR_Cmd = 0;
+ 916   3                      Flag_100ms_Task = 1;
+ 917   3                  }
+ 918   2                  
+ 919   2                  // 按EQ确认输入，进入选择运算符状态
+ 920   2                  if (IR_Cmd == IR_EQ) {
+ 921   3                      Calc_Current_State = CALC_SELECT_OP;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 16  
+
+ 922   3                      Calc_Input_Count = 0;
+ 923   3                      IR_Cmd = 0;
+ 924   3                      Flag_100ms_Task = 1;
+ 925   3                  }
+ 926   2                  
+ 927   2                  // 按VOL-清除当前输入
+ 928   2                  if (IR_Cmd == IR_VOL_MINUS) {
+ 929   3                      Calc_Num1 = 0;
+ 930   3                      Calc_Input_Count = 0;
+ 931   3                      IR_Cmd = 0;
+ 932   3                      Flag_100ms_Task = 1;
+ 933   3                  }
+ 934   2                  break;
+ 935   2                  
+ 936   2              case CALC_SELECT_OP:
+ 937   2                  // 选择运算符
+ 938   2                  if (IR_Cmd == IR_VOL_ADD) {
+ 939   3                      Calc_Operator = 1; // 加法
+ 940   3                      Calc_Current_State = CALC_INPUT_NUM2;
+ 941   3                      IR_Cmd = 0;
+ 942   3                      Flag_100ms_Task = 1;
+ 943   3                  } else if (IR_Cmd == IR_VOL_MINUS) {
+ 944   3                      Calc_Operator = 2; // 减法
+ 945   3                      Calc_Current_State = CALC_INPUT_NUM2;
+ 946   3                      IR_Cmd = 0;
+ 947   3                      Flag_100ms_Task = 1;
+ 948   3                  } else if (IR_Cmd == IR_1) {
+ 949   3                      Calc_Operator = 3; // 乘法（用1键代替*）
+ 950   3                      Calc_Current_State = CALC_INPUT_NUM2;
+ 951   3                      IR_Cmd = 0;
+ 952   3                      Flag_100ms_Task = 1;
+ 953   3                  } else if (IR_Cmd == IR_2) {
+ 954   3                      Calc_Operator = 4; // 除法（用2键代替/）
+ 955   3                      Calc_Current_State = CALC_INPUT_NUM2;
+ 956   3                      IR_Cmd = 0;
+ 957   3                      Flag_100ms_Task = 1;
+ 958   3                  }
+ 959   2                  
+ 960   2                  // 按START_STOP返回重新输入第一个数
+ 961   2                  if (IR_Cmd == IR_START_STOP) {
+ 962   3                      Calculator_Reset();
+ 963   3                      IR_Cmd = 0;
+ 964   3                      Flag_100ms_Task = 1;
+ 965   3                  }
+ 966   2                  break;
+ 967   2                  
+ 968   2              case CALC_INPUT_NUM2:
+ 969   2                  // 输入第二个数字
+ 970   2                  ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+ 971   2                  if (ir_digit != 0xFF) {
+ 972   3                      // 乘法限制为4位
+ 973   3                      if (Calc_Operator == 3 && Calc_Input_Count >= 4) {
+ 974   4                          IR_Cmd = 0;
+ 975   4                          break;
+ 976   4                      }
+ 977   3                      // 其他运算限制为8位
+ 978   3                      if (Calc_Operator != 3 && Calc_Input_Count >= 8) {
+ 979   4                          IR_Cmd = 0;
+ 980   4                          break;
+ 981   4                      }
+ 982   3                      
+ 983   3                      Calc_Num2 = Calc_Num2 * 10 + ir_digit;
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 17  
+
+ 984   3                      Calc_Input_Count++;
+ 985   3                      IR_Cmd = 0;
+ 986   3                      Flag_100ms_Task = 1;
+ 987   3                  }
+ 988   2                  
+ 989   2                  // 按EQ计算结果
+ 990   2                  if (IR_Cmd == IR_EQ) {
+ 991   3                      Calculator_Calculate();
+ 992   3                      IR_Cmd = 0;
+ 993   3                      Flag_100ms_Task = 1;
+ 994   3                  }
+ 995   2                  
+ 996   2                  // 按START_STOP返回重新输入
+ 997   2                  if (IR_Cmd == IR_START_STOP) {
+ 998   3                      Calculator_Reset();
+ 999   3                      IR_Cmd = 0;
+1000   3                      Flag_100ms_Task = 1;
+1001   3                  }
+1002   2                  break;
+1003   2                  
+1004   2              case CALC_SHOW_RESULT:
+1005   2                  // 显示结果后，按任意数字键开始新的计算
+1006   2                  ir_digit = IR_Cmd_To_Digit(IR_Cmd);
+1007   2                  if (ir_digit != 0xFF || IR_Cmd == IR_START_STOP) {
+1008   3                      Calculator_Reset();
+1009   3                      // 如果是数字键，将其作为第一个数的第一位
+1010   3                      if (ir_digit != 0xFF) {
+1011   4                          Calc_Num1 = ir_digit;
+1012   4                          Calc_Input_Count = 1;
+1013   4                      }
+1014   3                      IR_Cmd = 0;
+1015   3                      Flag_100ms_Task = 1;
+1016   3                  }
+1017   2                  break;
+1018   2          }
+1019   1          
+1020   1          // 周期性刷新显示
+1021   1          if (Flag_100ms_Task) {
+1022   2              Calculator_Display();
+1023   2              Flag_100ms_Task = 0;
+1024   2          }
+1025   1      }
+1026          
+1027          void main()
+1028          {
+1029   1      // ... (保持原样)
+1030   1        // AT24C02_clearTime();  // 清除 EEPROM 中的时间数据，强制重新初始化 - 注释掉以保留
+             -设置的时间
+1031   1        DS18B20_ConvertT();
+1032   1        Delay(750);
+1033   1        Temperature = (int)DS18B20_ReadT();
+1034   1        Temperature_Point = (int)(DS18B20_ReadT() * 100) % 100;
+1035   1        Calendar_Init();
+1036   1        Password_Init();  // 初始化密码系统
+1037   1        LCD_Init();
+1038   1        IR_Init();
+1039   1        Motor_Init();
+1040   1        while(1)
+1041   1        {
+1042   2          IR_Data_Proc();
+1043   2          Mode_Change();
+1044   2      
+C51 COMPILER V9.54   MAIN                                                                  10/14/2025 22:07:39 PAGE 18  
+
+1045   2          Calendar_Proc();
+1046   2          Safe_Proc();
+1047   2          Calculator_Proc();
+1048   2      
+1049   2        }
+1050   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3395    ----
+   CONSTANT SIZE    =    279    ----
+   XDATA SIZE       =    108    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4      53
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =     12       3
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

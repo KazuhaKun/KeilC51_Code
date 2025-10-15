@@ -1,4 +1,4 @@
-C51 COMPILER V9.54   MOTOR                                                                 10/14/2025 21:02:24 PAGE 1   
+C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 1   
 
 
 C51 COMPILER V9.54, COMPILATION OF MODULE MOTOR
@@ -11,97 +11,181 @@ line level    source
    1          #include <REGX52.H>
    2          #include "Timer1.h"
    3          #include "main.h"
-   4          
-   5          // 引脚定义
-   6          sbit Motor=P1^0;
-   7          
-   8          unsigned char Counter,Compare;
-   9          
-  10          /**
-  11            * @brief  电机初始化
-  12            * @param  无
-  13            * @retval 无
-  14            */
-  15          void Motor_Init(void)
-  16          {
-  17   1        Timer1_Init();
-  18   1      }
-  19          
-  20          /**
-  21            * @brief  电机设置速度
-  22            * @param  Speed 要设置的速度，范围0~100
-  23            * @retval 无
-  24            */
-  25          void Motor_SetSpeed(unsigned char Speed)
-  26          {
-  27   1        Compare=Speed;
-  28   1      }
-  29          
-  30          //定时器1中断函数
-  31          void Timer1_Routine() interrupt 3
-  32          {
-  33   1        static unsigned char SysTick_1s = 0; // 内部1秒计数（替代原来的SysTick）
-  34   1        static unsigned char SysTick_100ms = 0; // 内部100毫秒计数
-  35   1        static unsigned char SysTick_500ms = 0; // 内部500毫秒计数
-  36   1        TL1 = 0xA4;   //设置定时初值
-  37   1        TH1 = 0xFF;   //设置定时初值
-  38   1        Counter++;
-  39   1        Counter%=100; //计数值变化范围限制在0~99
-  40   1      
-  41   1        // 检查 10ms 周期是否完成 (Counter==0 happens every 10ms)
-  42   1        if(Counter == 0) {
-  43   2          // 0. 100ms 任务计数 (基于 10ms)
-  44   2          if (++SysTick_100ms >= 10) {
-  45   3            SysTick_100ms = 0;
-  46   3            Flag_100ms_Task = 1; // 100毫秒任务标志置位
-  47   3          }
-  48   2          // 0.5. 500ms 任务计数 (基于 10ms)
-  49   2          if (++SysTick_500ms >= 50) {
-  50   3            SysTick_500ms = 0;
-  51   3            Flag_500ms_Task = 1; // 500毫秒任务标志置位
-  52   3          }
-  53   2          // 1. 系统 1s 计数 (100 * 10ms = 1000ms)
-  54   2          if (++SysTick_1s >= 100) {
-C51 COMPILER V9.54   MOTOR                                                                 10/14/2025 21:02:24 PAGE 2   
+   4          #include "Delay.h"
+   5          
+   6          // 引脚定义 - 直流电机（原有的PWM控制）
+   7          sbit Motor=P1^0;
+   8          
+   9          // 步进电机引脚定义 - 28BYJ-48 (使用P1口的低4位)
+  10          // 连接到ULN2003D的IN1-IN4
+  11          sbit Stepper_A = P1^0;  // 对应电机A相，连接ULN2003D的IN1
+  12          sbit Stepper_B = P1^1;  // 对应电机B相，连接ULN2003D的IN2
+  13          sbit Stepper_C = P1^2;  // 对应电机C相，连接ULN2003D的IN3
+  14          sbit Stepper_D = P1^3;  // 对应电机D相，连接ULN2003D的IN4
+  15          
+  16          unsigned char Counter,Compare;
+  17          
+  18          /**
+  19            * @brief  电机初始化
+  20            * @param  无
+  21            * @retval 无
+  22            */
+  23          void Motor_Init(void)
+  24          {
+  25   1        Timer1_Init();
+  26   1      }
+  27          
+  28          /**
+  29            * @brief  电机设置速度
+  30            * @param  Speed 要设置的速度，范围0~100
+  31            * @retval 无
+  32            */
+  33          void Motor_SetSpeed(unsigned char Speed)
+  34          {
+  35   1        Compare=Speed;
+  36   1      }
+  37          
+  38          //定时器1中断函数
+  39          void Timer1_Routine() interrupt 3
+  40          {
+  41   1        static unsigned char SysTick_1s = 0; // 内部1秒计数（替代原来的SysTick）
+  42   1        static unsigned char SysTick_100ms = 0; // 内部100毫秒计数
+  43   1        static unsigned char SysTick_500ms = 0; // 内部500毫秒计数
+  44   1        TL1 = 0xA4;   //设置定时初值
+  45   1        TH1 = 0xFF;   //设置定时初值
+  46   1        Counter++;
+  47   1        Counter%=100; //计数值变化范围限制在0~99
+  48   1      
+  49   1        // 检查 10ms 周期是否完成 (Counter==0 happens every 10ms)
+  50   1        if(Counter == 0) {
+  51   2          // 0. 100ms 任务计数 (基于 10ms)
+  52   2          if (++SysTick_100ms >= 10) {
+  53   3            SysTick_100ms = 0;
+  54   3            Flag_100ms_Task = 1; // 100毫秒任务标志置位
+C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 2   
 
-  55   3            SysTick_1s = 0;
-  56   3            Flag_1s_Task = 1; // 1秒任务标志置位
-  57   3                  
-  58   3            // 2. 5s 任务计数 (基于 1s)
-  59   3            if (++Time_5s_Count >= 5) {
-  60   4              Time_5s_Count = 0;
-  61   4              Flag_5s_Task = 1; // 5秒任务标志置位
-  62   4            }            
-  63   3          }
-  64   2              
-  65   2              // 4. DS18B20 750ms 非阻塞等待 (75 * 10ms = 750ms)
-  66   2              // 假设你在主循环启动转换后，会进入 Temp_State = 1，并开始计时
-  67   2              if (Temp_State == 1) {
-  68   3                  static unsigned char Delay_750ms = 0;
-  69   3                  if (++Delay_750ms >= 75) {
-  70   4                      Delay_750ms = 0;
-  71   4                      Flag_750ms_Ready = 1; // 750ms 转换完成标志
-  72   4                  }
-  73   3              }
-  74   2        }
-  75   1      
-  76   1        if(Counter<Compare) //计数值小于比较值
-  77   1        {
-  78   2          Motor=1;    //输出1
-  79   2        }
-  80   1        else        //计数值大于比较值
-  81   1        {
-  82   2          Motor=0;    //输出0
-  83   2        }
-  84   1      }
+  55   3          }
+  56   2          // 0.5. 500ms 任务计数 (基于 10ms)
+  57   2          if (++SysTick_500ms >= 50) {
+  58   3            SysTick_500ms = 0;
+  59   3            Flag_500ms_Task = 1; // 500毫秒任务标志置位
+  60   3          }
+  61   2          // 1. 系统 1s 计数 (100 * 10ms = 1000ms)
+  62   2          if (++SysTick_1s >= 100) {
+  63   3            SysTick_1s = 0;
+  64   3            Flag_1s_Task = 1; // 1秒任务标志置位
+  65   3                  
+  66   3            // 2. 5s 任务计数 (基于 1s)
+  67   3            if (++Time_5s_Count >= 5) {
+  68   4              Time_5s_Count = 0;
+  69   4              Flag_5s_Task = 1; // 5秒任务标志置位
+  70   4            }            
+  71   3          }
+  72   2              
+  73   2              // 4. DS18B20 750ms 非阻塞等待 (75 * 10ms = 750ms)
+  74   2              // 假设你在主循环启动转换后，会进入 Temp_State = 1，并开始计时
+  75   2              if (Temp_State == 1) {
+  76   3                  static unsigned char Delay_750ms = 0;
+  77   3                  if (++Delay_750ms >= 75) {
+  78   4                      Delay_750ms = 0;
+  79   4                      Flag_750ms_Ready = 1; // 750ms 转换完成标志
+  80   4                  }
+  81   3              }
+  82   2        }
+  83   1      
+  84   1        if(Counter<Compare) //计数值小于比较值
+  85   1        {
+  86   2          Motor=1;    //输出1
+  87   2        }
+  88   1        else        //计数值大于比较值
+  89   1        {
+  90   2          Motor=0;    //输出0
+  91   2        }
+  92   1      }
+  93          
+  94          /*========== 步进电机控制函数 ==========*/
+  95          
+  96          // 四拍驱动时序数组（高扭矩模式）
+  97          // 对应 P1.3 P1.2 P1.1 P1.0 -> D C B A
+  98          code unsigned char Stepper_Code_4_Step[4] = {
+  99              0x03, // 0011B (A, B ON)
+ 100              0x06, // 0110B (B, C ON)
+ 101              0x0C, // 1100B (C, D ON)
+ 102              0x09  // 1001B (D, A ON)
+ 103          };
+ 104          
+ 105          /**
+ 106            * @brief  步进电机旋转指定步数
+ 107            * @param  steps 步数（28BYJ-48一圈约512步，使用四拍模式）
+ 108            * @param  direction 方向，0-正转，1-反转
+ 109            * @retval 无
+ 110            */
+ 111          void Stepper_Motor_Rotate(unsigned int steps, unsigned char direction)
+ 112          {
+ 113   1          unsigned int i;
+ 114   1          static unsigned char step_index = 0; // 记录当前步序的索引
+ 115   1          
+ 116   1          for (i = 0; i < steps; i++)
+C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 3   
+
+ 117   1          {
+ 118   2              if (direction == 0) // 正转
+ 119   2              {
+ 120   3                  step_index++;
+ 121   3                  if (step_index > 3) step_index = 0; // 循环索引 0->1->2->3->0
+ 122   3              }
+ 123   2              else // 反转
+ 124   2              {
+ 125   3                  if (step_index == 0) step_index = 4; // 防止无符号减到负数
+ 126   3                  step_index--;
+ 127   3                  // 循环索引 0->3->2->1->0
+ 128   3              }
+ 129   2              
+ 130   2              // 将时序值输出到P1口的低4位（P1.0-P1.3）
+ 131   2              // 保留P1口高4位的状态
+ 132   2              P1 = (P1 & 0xF0) | Stepper_Code_4_Step[step_index];
+ 133   2              
+ 134   2              // 延时控制转速，2ms延时产生较快的转速
+ 135   2              Delay(2); // 使用已有的Delay函数（约2ms）
+ 136   2          }
+ 137   1          
+ 138   1          // 停止时关闭所有相，降低功耗和发热
+ 139   1          P1 = P1 & 0xF0; // 清除低4位
+ 140   1      }
+ 141          
+ 142          /**
+ 143            * @brief  步进电机开门动作（正转5圈后反转5圈）
+ 144            * @param  无
+ 145            * @retval 无
+ 146            * @note   28BYJ-48使用四拍模式，一圈约512步
+ 147            *         5圈 = 512 * 5 = 2560步
+ 148            */
+ 149          void Stepper_Motor_OpenDoor(void)
+ 150          {
+ 151   1          unsigned int steps_per_circle = 512; // 28BYJ-48四拍模式一圈的步数
+ 152   1          unsigned char circles = 5;            // 旋转圈数
+ 153   1          unsigned int total_steps = steps_per_circle * circles; // 总步数：2560步
+ 154   1          
+ 155   1          // 正转5圈
+ 156   1          Stepper_Motor_Rotate(total_steps, 0);
+ 157   1          
+ 158   1          // 中间暂停500ms
+ 159   1          Delay(500);
+ 160   1          
+ 161   1          // 反转5圈
+ 162   1          Stepper_Motor_Rotate(total_steps, 1);
+ 163   1          
+ 164   1          // 完成后确保电机停止
+ 165   1          P1 = P1 & 0xF0; // 清除低4位，关闭所有相
+ 166   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    127    ----
-   CONSTANT SIZE    =   ----    ----
+   CODE SIZE        =    250    ----
+   CONSTANT SIZE    =      4    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =      6    ----
+   DATA SIZE        =      7       7
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.

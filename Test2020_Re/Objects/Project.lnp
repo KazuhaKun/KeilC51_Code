@@ -1,0 +1,18 @@
+".\Objects\main.obj",
+".\Objects\Delay.obj",
+".\Objects\Key.obj",
+".\Objects\Nixie.obj",
+".\Objects\Timer1.obj",
+".\Objects\Motor.obj",
+".\Objects\Int0.obj",
+".\Objects\Timer0.obj",
+".\Objects\IR.obj",
+".\Objects\DS1302.obj",
+".\Objects\AT24C02.obj",
+".\Objects\DS18B20.obj",
+".\Objects\OneWire.obj",
+".\Objects\I2C.obj",
+".\Objects\LCD1602.obj" 
+TO ".\Objects\Project" 
+PRINT(".\Listings\Project.m51") RAMSIZE(256) 
+DISABLEWARNING (16) 

@@ -380,26 +380,6 @@
               <FilePath>.\Delay.h</FilePath>
             </File>
             <File>
-              <FileName>Key.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Key.c</FilePath>
-            </File>
-            <File>
-              <FileName>Key.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Key.h</FilePath>
-            </File>
-            <File>
-              <FileName>Nixie.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Nixie.c</FilePath>
-            </File>
-            <File>
-              <FileName>Nixie.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Nixie.h</FilePath>
-            </File>
-            <File>
               <FileName>Timer1.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Timer1.c</FilePath>
@@ -508,6 +488,16 @@
               <FileName>LCD1602.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\LCD1602.h</FilePath>
+            </File>
+            <File>
+              <FileName>Buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Buzzer.c</FilePath>
+            </File>
+            <File>
+              <FileName>Buzzer.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Buzzer.h</FilePath>
             </File>
           </Files>
         </Group>
