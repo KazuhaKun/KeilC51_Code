@@ -1,5 +1,6 @@
 Build target 'Target 1'
-compiling main.c...
-main.c(549): error C202: 'NULL': undefined identifier
-Target not created.
+linking...
+Program Size: data=104.5 xdata=108 code=8159
+creating hex file from ".\Objects\Project"...
+".\Objects\Project" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:00

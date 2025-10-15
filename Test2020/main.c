@@ -108,12 +108,65 @@ void IR_Data_Proc(void)
 {
 	if (IR_GetDataFlag()){IR_Cmd=IR_GetCommand();}
 }
+
+/**
+ * @brief 系统重置函数（按POWER键触发）
+ * @param 无
+ * @retval 无
+ * @note 重置内容：
+ *       1. 模式重置为万年历模式
+ *       2. 时间恢复到2019年12月31日23:59:00
+ *       3. 密码重置为00000000
+ */
+void System_Reset(void)
+{
+    unsigned char i;
+    
+    // 1. 重置模式为万年历
+    mode = Calendar;
+    Cal_Mode = 0;  // 显示模式
+    
+    // 2. 重置时间为 2019-12-31 23:59:00
+    DS1302_Time[0] = 19;  // 年
+    DS1302_Time[1] = 12;  // 月
+    DS1302_Time[2] = 31;  // 日
+    DS1302_Time[3] = 23;  // 时
+    DS1302_Time[4] = 59;  // 分
+    DS1302_Time[5] = 0;   // 秒
+    DS1302_Time[6] = 2;   // 星期二
+    
+    // 设置时间到DS1302
+    DS1302_SetTime();
+    
+    // 备份时间到EEPROM
+    for(i = 0; i < 7; i++){
+        AT24C02_WriteByte(0x00 + i, DS1302_Time[i]); 
+        Delay(5);
+    }
+    
+    // 3. 重置密码为 00000000
+    for(i = 0; i < PASSWORD_LENGTH; i++){
+        Saved_Password[i] = 0;  // 全部设为0
+        AT24C02_WriteByte(EEPROM_PASSWORD_ADDR + i, 0);
+        Delay(5);
+    }
+    
+    // 4. 显示重置完成信息
+    LCD_ShowString(1, 1, "System Reset!   ");
+    LCD_ShowString(2, 1, "Time&PWD Reset  ");
+    Delay(2000);  // 显示2秒
+    
+    // 5. 清除屏幕，准备显示万年历
+    LCD_Init();
+}
+
 void Mode_Change(void){
 	if (IR_Cmd == IR_MODE){
 		mode = (Mode)((mode + 1) % 3);
 		IR_Cmd = 0;
 	}else if (IR_Cmd == IR_POWER){
-		mode = Calendar;	//重置
+		// 调用系统重置函数
+		System_Reset();
 		IR_Cmd = 0;
 	}
 }
