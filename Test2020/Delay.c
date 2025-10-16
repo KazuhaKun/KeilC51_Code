@@ -13,3 +13,10 @@ void Delay(unsigned int xms)
 	}
 }
 
+void Delay100us()		//@11.0592MHz
+{
+	unsigned char i;
+
+	i = 43;
+	while (--i);
+}

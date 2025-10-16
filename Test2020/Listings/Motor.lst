@@ -1,10 +1,10 @@
-C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 1   
+C51 COMPILER V9.54   MOTOR                                                                 10/16/2025 21:25:09 PAGE 1   
 
 
 C51 COMPILER V9.54, COMPILATION OF MODULE MOTOR
 OBJECT MODULE PLACED IN .\Objects\Motor.obj
-COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Motor.c OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\Moto
-                    -r.lst) TABS(2) OBJECT(.\Objects\Motor.obj)
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Motor.c ROM(COMPACT) OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\
+                    -Listings\Motor.lst) TABS(2) OBJECT(.\Objects\Motor.obj)
 
 line level    source
 
@@ -13,8 +13,8 @@ line level    source
    3          #include "main.h"
    4          #include "Delay.h"
    5          
-   6          // 引脚定义 - 直流电机（原有的PWM控制）
-   7          sbit Motor=P1^0;
+   6          // // 引脚定义 - 直流电机（原有的PWM控制）
+   7          // sbit Motor=P1^0;
    8          
    9          // 步进电机引脚定义 - 28BYJ-48 (使用P1口的低4位)
   10          // 连接到ULN2003D的IN1-IN4
@@ -25,25 +25,25 @@ line level    source
   15          
   16          unsigned char Counter,Compare;
   17          
-  18          /**
-  19            * @brief  电机初始化
-  20            * @param  无
-  21            * @retval 无
-  22            */
+  18          // /**
+  19          //   * @brief  电机初始化
+  20          //   * @param  无
+  21          //   * @retval 无
+  22          //   */
   23          void Motor_Init(void)
   24          {
   25   1        Timer1_Init();
   26   1      }
   27          
-  28          /**
-  29            * @brief  电机设置速度
-  30            * @param  Speed 要设置的速度，范围0~100
-  31            * @retval 无
-  32            */
-  33          void Motor_SetSpeed(unsigned char Speed)
-  34          {
-  35   1        Compare=Speed;
-  36   1      }
+  28          // /**
+  29          //   * @brief  电机设置速度
+  30          //   * @param  Speed 要设置的速度，范围0~100
+  31          //   * @retval 无
+  32          //   */
+  33          // void Motor_SetSpeed(unsigned char Speed)
+  34          // {
+  35          //  Compare=Speed;
+  36          // }
   37          
   38          //定时器1中断函数
   39          void Timer1_Routine() interrupt 3
@@ -62,7 +62,7 @@ line level    source
   52   2          if (++SysTick_100ms >= 10) {
   53   3            SysTick_100ms = 0;
   54   3            Flag_100ms_Task = 1; // 100毫秒任务标志置位
-C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 2   
+C51 COMPILER V9.54   MOTOR                                                                 10/16/2025 21:25:09 PAGE 2   
 
   55   3          }
   56   2          // 0.5. 500ms 任务计数 (基于 10ms)
@@ -93,99 +93,77 @@ line level    source
   81   3              }
   82   2        }
   83   1      
-  84   1        if(Counter<Compare) //计数值小于比较值
-  85   1        {
-  86   2          Motor=1;    //输出1
-  87   2        }
-  88   1        else        //计数值大于比较值
-  89   1        {
-  90   2          Motor=0;    //输出0
-  91   2        }
+  84   1        // if(Counter<Compare)  //计数值小于比较值
+  85   1        // {
+  86   1        //  Motor=1;    //输出1
+  87   1        // }
+  88   1        // else       //计数值大于比较值
+  89   1        // {
+  90   1        //  Motor=0;    //输出0
+  91   1        // }
   92   1      }
   93          
   94          /*========== 步进电机控制函数 ==========*/
   95          
-  96          // 四拍驱动时序数组（高扭矩模式）
+  96          // 八拍驱动时序数组（半步模式，高精度）
   97          // 对应 P1.3 P1.2 P1.1 P1.0 -> D C B A
-  98          code unsigned char Stepper_Code_4_Step[4] = {
-  99              0x03, // 0011B (A, B ON)
- 100              0x06, // 0110B (B, C ON)
- 101              0x0C, // 1100B (C, D ON)
- 102              0x09  // 1001B (D, A ON)
- 103          };
- 104          
- 105          /**
- 106            * @brief  步进电机旋转指定步数
- 107            * @param  steps 步数（28BYJ-48一圈约512步，使用四拍模式）
- 108            * @param  direction 方向，0-正转，1-反转
- 109            * @retval 无
- 110            */
- 111          void Stepper_Motor_Rotate(unsigned int steps, unsigned char direction)
- 112          {
- 113   1          unsigned int i;
- 114   1          static unsigned char step_index = 0; // 记录当前步序的索引
- 115   1          
- 116   1          for (i = 0; i < steps; i++)
-C51 COMPILER V9.54   MOTOR                                                                 10/15/2025 22:28:59 PAGE 3   
+  98          // code unsigned char phases[8] = {
+  99          //     0x01, // 0001B (A)
+ 100          //     0x03, // 0011B (A, B)
+ 101          //     0x02, // 0010B (B)
+ 102          //     0x06, // 0110B (B, C)
+ 103          //     0x04, // 0100B (C)
+ 104          //     0x0C, // 1100B (C, D)
+ 105          //     0x08, // 1000B (D)
+ 106          //     0x09  // 1001B (D, A)
+ 107          // };
+ 108          
+ 109          unsigned char  xdata phases[8] = {   // 八拍驱动相位表（每相依次通电）
+ 110              0x01, 0x03, 0x02, 0x06,   // A -> AB -> B -> BC
+ 111              0x04, 0x0C, 0x08, 0x09    // C -> CD -> D -> DA
+ 112          };
+ 113          
+ 114          /**
+ 115            * @brief  步进电机开门动作（正转10圈后反转10圈）
+ 116            * @param  无
+C51 COMPILER V9.54   MOTOR                                                                 10/16/2025 21:25:09 PAGE 3   
 
- 117   1          {
- 118   2              if (direction == 0) // 正转
- 119   2              {
- 120   3                  step_index++;
- 121   3                  if (step_index > 3) step_index = 0; // 循环索引 0->1->2->3->0
- 122   3              }
- 123   2              else // 反转
- 124   2              {
- 125   3                  if (step_index == 0) step_index = 4; // 防止无符号减到负数
- 126   3                  step_index--;
- 127   3                  // 循环索引 0->3->2->1->0
- 128   3              }
- 129   2              
- 130   2              // 将时序值输出到P1口的低4位（P1.0-P1.3）
- 131   2              // 保留P1口高4位的状态
- 132   2              P1 = (P1 & 0xF0) | Stepper_Code_4_Step[step_index];
- 133   2              
- 134   2              // 延时控制转速，2ms延时产生较快的转速
- 135   2              Delay(2); // 使用已有的Delay函数（约2ms）
- 136   2          }
- 137   1          
- 138   1          // 停止时关闭所有相，降低功耗和发热
- 139   1          P1 = P1 & 0xF0; // 清除低4位
- 140   1      }
- 141          
- 142          /**
- 143            * @brief  步进电机开门动作（正转5圈后反转5圈）
- 144            * @param  无
- 145            * @retval 无
- 146            * @note   28BYJ-48使用四拍模式，一圈约512步
- 147            *         5圈 = 512 * 5 = 2560步
- 148            */
- 149          void Stepper_Motor_OpenDoor(void)
- 150          {
- 151   1          unsigned int steps_per_circle = 512; // 28BYJ-48四拍模式一圈的步数
- 152   1          unsigned char circles = 5;            // 旋转圈数
- 153   1          unsigned int total_steps = steps_per_circle * circles; // 总步数：2560步
- 154   1          
- 155   1          // 正转5圈
- 156   1          Stepper_Motor_Rotate(total_steps, 0);
- 157   1          
- 158   1          // 中间暂停500ms
- 159   1          Delay(500);
- 160   1          
- 161   1          // 反转5圈
- 162   1          Stepper_Motor_Rotate(total_steps, 1);
- 163   1          
- 164   1          // 完成后确保电机停止
- 165   1          P1 = P1 & 0xF0; // 清除低4位，关闭所有相
- 166   1      }
+ 117            * @retval 无
+ 118            * @note   28BYJ-48使用八拍模式，一圈约2048步
+ 119            *         10圈 = 2048 * 10 = 20480步
+ 120            */
+ 121          void Stepper_Motor_OpenDoor(void)
+ 122          {
+ 123   1          unsigned int s;
+ 124   1          unsigned char step;
+ 125   1          
+ 126   1          // 正转 10 圈 (之前是反转逻辑，现在用于正转)
+ 127   1          for(s = 0; s < 10 * 2048; s++)
+ 128   1          {
+ 129   2              step = s % 8;
+ 130   2              P1 = (P1 & 0xF0) | phases[7 - step]; // 使用反转时序
+ 131   2              Delay(1);
+ 132   2          }
+ 133   1      
+ 134   1          // 反转 10 圈 (之前是正转逻辑，现在用于反转)
+ 135   1          for(s = 0; s < 10 * 2048; s++)
+ 136   1          {
+ 137   2              step = s % 8;
+ 138   2              P1 = (P1 & 0xF0) | phases[step]; // 使用正转时序
+ 139   2              Delay(1);
+ 140   2          }
+ 141   1      
+ 142   1          // 停止：关闭所有线圈
+ 143   1          P1 &= 0xF0;
+ 144   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    250    ----
-   CONSTANT SIZE    =      4    ----
-   XDATA SIZE       =   ----    ----
+   CODE SIZE        =    215    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      8    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =      7       7
+   DATA SIZE        =      6       3
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.

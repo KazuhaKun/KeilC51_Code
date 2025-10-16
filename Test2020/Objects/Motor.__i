@@ -1,1 +1,1 @@
-"Motor.c" OPTIMIZE (9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\Motor.lst) TABS (2) OBJECT(.\Objects\Motor.obj)
+"Motor.c" ROM(COMPACT) OPTIMIZE (9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\Motor.lst) TABS (2) OBJECT(.\Objects\Motor.obj)

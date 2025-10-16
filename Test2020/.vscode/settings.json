@@ -1,3 +1,9 @@
 {
-    "C_Cpp.default.compilerPath": ""
+    "C_Cpp.default.compilerPath": "",
+    "files.associations": {
+        "*.h": "c",
+        "*.C": "c",
+        "*.c": "c",
+        "REGX52.H": "cpp"
+    }
 }
